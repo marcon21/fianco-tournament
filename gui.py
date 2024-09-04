@@ -3,6 +3,7 @@ import pygame
 from pygame.locals import *
 import string
 from copy import deepcopy
+from random import random
 
 CELL_SIZE = 100
 RADIUS = CELL_SIZE / 2 - 5
@@ -137,10 +138,14 @@ class Board:
 
         return valid_moves
 
-    def move(self, move: string):
+    def move(self, move):
         # String in format A1-A2
-        start = self.convert_coord_to_abs(move[:2])
-        end = self.convert_coord_to_abs(move[3:])
+        if type(move) == str:
+            start = self.convert_coord_to_abs(move[:2])
+            end = self.convert_coord_to_abs(move[3:])
+        else:
+            start = move[0]
+            end = move[1]
 
         if not self.is_move_valid(start, end):
             print("Invalid move")
@@ -310,19 +315,87 @@ class Board:
             )
 
 
+class Engine:
+    def __init__(self, player=1):
+        self.player = player
+        self.max_eval = 15
+
+    def evaluate(self, board: Board, randomize=False):
+        unique, counts = np.unique(board.board, return_counts=True)
+        count_dict = dict(zip(unique, counts))
+        material_diff = count_dict[1] - count_dict[2]
+
+        return material_diff
+
+    def get_best_move(self, board: Board, depth=3):
+        best_eval = -np.inf
+        best_move = None
+        for piece, moves in board.legal_moves.items():
+            piece = [int(piece[0]), int(piece[1])]
+            for move in moves:
+                new_board = deepcopy(board)
+                new_board.move((piece, move))
+                eval = self.minimax(new_board, depth, False)
+                if eval > best_eval:
+                    best_eval = eval
+                    best_move = f"{board.convert_coord_to_str(piece)}-{board.convert_coord_to_str(move)}"
+        return best_move
+
+    def minimax(self, board: Board, depth, is_maximizing):
+        if depth == 0:
+            return self.evaluate(board)
+
+        if is_maximizing:
+            best_eval = -np.inf
+            for piece, moves in board.legal_moves.items():
+                piece = [int(piece[0]), int(piece[1])]
+                for move in moves:
+                    new_board = deepcopy(board)
+                    new_board.move((piece, move))
+                    eval = self.minimax(new_board, depth - 1, False)
+                    best_eval = max(best_eval, eval)
+            return best_eval
+        else:
+            best_eval = np.inf
+            for piece, moves in board.legal_moves.items():
+                piece = [int(piece[0]), int(piece[1])]
+                for move in moves:
+                    new_board = deepcopy(board)
+                    new_board.move((piece, move))
+                    eval = self.minimax(new_board, depth - 1, True)
+                    best_eval = min(best_eval, eval)
+            return best_eval
+
+
 board = Board()
+engine = Engine()
 current_selection = None
+current_board_eval = engine.evaluate(board)
 
 while True:
     for event in pygame.event.get():
         if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
             pygame.quit()
             exit()
+        if event.type == KEYDOWN:
+            if event.key == K_r:
+                board = Board()
+                current_selection = None
+                current_board_eval = engine.evaluate(board)
+            elif event.key == K_e:
+                best_move = engine.get_best_move(board, depth=3)
+                print(best_move)
+                board.move(best_move)
+                current_board_eval = engine.evaluate(board)
+
         if event.type == MOUSEBUTTONDOWN:
             pos = pygame.mouse.get_pos()
             x, y = pos
             x = x // CELL_SIZE
             y = y // CELL_SIZE
+
+            if y > 8 or y < 0 or x > 8 or x < 0:
+                continue
 
             new_selection = [y, x]
 
@@ -336,6 +409,7 @@ while True:
                     board.move(
                         f"{board.convert_coord_to_str(current_selection)}-{board.convert_coord_to_str(new_selection)}"
                     )
+                    current_board_eval = engine.evaluate(board)
 
                 current_selection = None
             else:
@@ -353,7 +427,22 @@ while True:
     # Current player text
     player = "White" if board.current_player == 1 else "Black"
     text = font.render(f"Current player: {player}", True, (0, 0, 0))
-    window.blit(text, (WIDTH - 250, HEIGHT - 50))
+    window.blit(text, (WIDTH - 270, HEIGHT - 40))
+
+    # Evaluation Bar
+    # mapped_value = np.interp(
+    #     -current_board_eval, [-engine.max_eval, engine.max_eval], [100, (HEIGHT - 100)]
+    # )
+    # pygame.draw.rect(
+    #     window,
+    #     (0, 255, 0),
+    #     (9 * CELL_SIZE + 20, mapped_value, 50, (HEIGHT - 100) - (mapped_value + 0)),
+    # )
+    # pygame.draw.rect(window, (0, 0, 0), (9 * CELL_SIZE + 20, 100, 50, HEIGHT - 200), 5)
+    # text = font.render(
+    #     f"{'+' if current_board_eval>=0 else ' '}{current_board_eval}", True, (0, 0, 0)
+    # )
+    # window.blit(text, (9 * CELL_SIZE + 30, HEIGHT - 90))
 
     pygame.display.flip()
 
