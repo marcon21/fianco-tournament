@@ -5,6 +5,7 @@ import string
 from copy import deepcopy
 
 CELL_SIZE = 100
+RADIUS = CELL_SIZE / 2 - 5
 
 GAME_RES = WIDTH, HEIGHT = CELL_SIZE * 9 + 300, CELL_SIZE * 9
 FPS = 60
@@ -23,8 +24,11 @@ font = pygame.font.SysFont("Arial", 24)
 class Board:
     def __init__(self):
         self.board = self.new_board()
+        self.legal_moves = {}
         self.current_player = 1
         self.past_moves = []
+
+        self.calculate_legal_moves()
 
     def new_board(self):
         board = np.zeros((9, 9), dtype=int)
@@ -55,12 +59,41 @@ class Board:
     def set_board(self, board):
         self.board = board
 
+    def calculate_legal_moves(self):
+        self.legal_moves = self.get_all_possible_moves(self.current_player)
+
     def get_all_possible_moves(self, player):
-        pass
+        legal_moves = {}
+        self.capturers = []
+        for i in range(9):
+            for j in range(9):
+                if self.board[i, j] == player:
+                    moves = self.get_possible_moves([i, j])
+                    legal_moves[f"{i}{j}"] = []
+                    only_captures = []
+                    for move in moves:
+                        if abs(i - move[0]) > 1:
+                            only_captures.append(move)
+
+                    if only_captures:
+                        legal_moves[f"{i}{j}"] = only_captures
+                        self.capturers.append([i, j])
+                    else:
+                        legal_moves[f"{i}{j}"] = moves
+
+        new_legal_moves = {}
+        for capturer in self.capturers:
+            new_legal_moves[f"{capturer[0]}{capturer[1]}"] = legal_moves[
+                f"{capturer[0]}{capturer[1]}"
+            ]
+        if new_legal_moves:
+            return new_legal_moves
+
+        return legal_moves
 
     def get_possible_moves(self, piece):
         if type(piece) == str:
-            piece = self.convert_coordinates(piece)
+            piece = self.convert_coord_to_abs(piece)
 
         player = self.board[piece[0], piece[1]]
 
@@ -78,17 +111,21 @@ class Board:
         if player == 1:
             moves.append([piece[0] - 1, piece[1]])
             # Capture moves
-            if self.board[piece[0] - 1, piece[1] + 1] == 2:
-                moves.append([piece[0] - 2, piece[1] + 2])
-            if self.board[piece[0] - 1, piece[1] - 1] == 2:
-                moves.append([piece[0] - 2, piece[1] - 2])
+            if piece[0] > 1 and piece[1] < 7:
+                if self.board[piece[0] - 1, piece[1] + 1] == 2:
+                    moves.append([piece[0] - 2, piece[1] + 2])
+            if piece[0] > 1 and piece[1] > 1:
+                if self.board[piece[0] - 1, piece[1] - 1] == 2:
+                    moves.append([piece[0] - 2, piece[1] - 2])
         elif player == 2:
             moves.append([piece[0] + 1, piece[1]])
             # Capture moves
-            if self.board[piece[0] + 1, piece[1] + 1] == 1:
-                moves.append([piece[0] + 2, piece[1] + 2])
-            if self.board[piece[0] + 1, piece[1] - 1] == 1:
-                moves.append([piece[0] + 2, piece[1] - 2])
+            if piece[0] < 7 and piece[1] < 7:
+                if self.board[piece[0] + 1, piece[1] + 1] == 1:
+                    moves.append([piece[0] + 2, piece[1] + 2])
+            if piece[0] < 7 and piece[1] > 1:
+                if self.board[piece[0] + 1, piece[1] - 1] == 1:
+                    moves.append([piece[0] + 2, piece[1] - 2])
 
         valid_moves = []
         for move in moves:
@@ -98,34 +135,20 @@ class Board:
                 if self.board[move[0], move[1]] == 0:
                     valid_moves.append(move)
 
-        only_captures = []
-        for move in valid_moves:
-            if abs(piece[0] - move[0]) == 2:
-                only_captures.append(move)
-
-        if only_captures:
-            return only_captures
-
         return valid_moves
 
     def move(self, move: string):
         # String in format A1-A2
-        start = self.convert_coordinates(move[:2])
-        end = self.convert_coordinates(move[3:])
-
-        if self.board[start[0], start[1]] != self.current_player:
-            print("Invalid move")
-            return
+        start = self.convert_coord_to_abs(move[:2])
+        end = self.convert_coord_to_abs(move[3:])
 
         if not self.is_move_valid(start, end):
             print("Invalid move")
             return
 
-        # Check if move is a capture
-        if abs(start[0] - end[0]) == 2:
-            self.board[
-                start[0] + (end[0] - start[0]) // 2, start[1] + (end[1] - start[1]) // 2
-            ] = 0
+        # Capture
+        if abs(start[0] - end[0]) > 1:
+            self.board[(start[0] + end[0]) // 2, (start[1] + end[1]) // 2] = 0
 
         self.board[end[0], end[1]] = self.board[start[0], start[1]]
         self.board[start[0], start[1]] = 0
@@ -133,10 +156,16 @@ class Board:
         self.past_moves.append(move)
         self.current_player = self.current_player % 2 + 1
 
-    def convert_coordinates(self, pos: string):
+        self.calculate_legal_moves()
+
+    def convert_coord_to_abs(self, pos: string):
         # Pos in format A1 to (8, 0)
         pos = pos.upper()
         return [9 - int(pos[1]), string.ascii_uppercase.index(pos[0])]
+
+    def convert_coord_to_str(self, pos):
+        # Pos in format (8, 0) to A1
+        return f"{string.ascii_uppercase[pos[1]]}{9 - pos[0]}"
 
     def is_game_over(self):
         if 1 in self.board[0, :]:
@@ -145,13 +174,18 @@ class Board:
             return 2
 
     def is_move_valid(self, start, end):
-        moves = self.get_possible_moves(start)
-        if end not in moves:
+        if self.board[start[0], start[1]] != self.current_player:
+            return False
+
+        if self.board[end[0], end[1]] != 0:
+            return False
+
+        if end not in self.legal_moves[f"{start[0]}{start[1]}"]:
             return False
 
         return True
 
-    def draw_board(self, window):
+    def draw_board(self, window, active_piece=None):
         for i in range(9):
             pygame.draw.line(
                 window,
@@ -166,35 +200,60 @@ class Board:
                 (CELL_SIZE * 9 - CELL_SIZE / 2, i * CELL_SIZE + CELL_SIZE / 2),
             )
 
+        for capturer in self.capturers:
+            # Draw capturer
+            pygame.draw.circle(
+                window,
+                (0, 0, 255),
+                (
+                    capturer[1] * CELL_SIZE + CELL_SIZE / 2,
+                    capturer[0] * CELL_SIZE + CELL_SIZE / 2,
+                ),
+                RADIUS + 3,
+            )
+
+        if active_piece:
+            pygame.draw.circle(
+                window,
+                (255, 0, 0),
+                (
+                    active_piece[1] * CELL_SIZE + CELL_SIZE / 2,
+                    active_piece[0] * CELL_SIZE + CELL_SIZE / 2,
+                ),
+                RADIUS + 4,
+            )
+
         for i in range(9):
             for j in range(9):
-                radius = CELL_SIZE / 2 - 5
+                # Empty cell
                 if self.board[i, j] == 0:
                     pygame.draw.circle(
                         window,
                         (255, 255, 255),
                         (j * CELL_SIZE + CELL_SIZE / 2, i * CELL_SIZE + CELL_SIZE / 2),
-                        radius / 2,
+                        RADIUS / 2,
                     )
                 elif self.board[i, j] == 1:
+                    # Draw white piece
                     pygame.draw.circle(
                         window,
                         (0, 0, 0),
                         (j * CELL_SIZE + CELL_SIZE / 2, i * CELL_SIZE + CELL_SIZE / 2),
-                        radius + 1,
+                        RADIUS + 1,
                     )
                     pygame.draw.circle(
                         window,
                         (255, 255, 255),
                         (j * CELL_SIZE + CELL_SIZE / 2, i * CELL_SIZE + CELL_SIZE / 2),
-                        radius,
+                        RADIUS,
                     )
                 elif self.board[i, j] == 2:
+                    # Draw black piece
                     pygame.draw.circle(
                         window,
                         (0, 0, 0),
                         (j * CELL_SIZE + CELL_SIZE / 2, i * CELL_SIZE + CELL_SIZE / 2),
-                        radius,
+                        RADIUS,
                     )
 
                 # Write the coordinates
@@ -208,6 +267,7 @@ class Board:
                 # text = font.render(
                 #     f"{string.ascii_uppercase[j]}{9-i} ({i},{j})", True, text_c
                 # )
+
                 window.blit(
                     text,
                     (
@@ -232,9 +292,12 @@ class Board:
 
     def draw_possible_moves(self, window, piece):
         if type(piece) == str:
-            piece = self.convert_coordinates(piece)
+            piece = self.convert_coord_to_abs(piece)
 
-        moves = self.get_possible_moves(piece)
+        try:
+            moves = self.legal_moves[f"{piece[0]}{piece[1]}"]
+        except KeyError:
+            moves = []
         for move in moves:
             pygame.draw.circle(
                 window,
@@ -261,10 +324,17 @@ while True:
             x = x // CELL_SIZE
             y = y // CELL_SIZE
 
+            new_selection = [y, x]
+
             if current_selection is not None:
-                if [y, x] in board.get_possible_moves(current_selection):
+                if (
+                    new_selection
+                    in board.legal_moves[
+                        f"{current_selection[0]}{current_selection[1]}"
+                    ]
+                ):
                     board.move(
-                        f"{string.ascii_uppercase[current_selection[1]]}{9 - current_selection[0]}-{string.ascii_uppercase[x]}{9 - y}"
+                        f"{board.convert_coord_to_str(current_selection)}-{board.convert_coord_to_str(new_selection)}"
                     )
 
                 current_selection = None
@@ -275,12 +345,12 @@ while True:
     window.fill(SCREEN_COLOR)
 
     # Draw board
-    board.draw_board(window)
+    board.draw_board(window, active_piece=current_selection)
     board.print_history(window)
     if current_selection:
         board.draw_possible_moves(window, current_selection)
 
-    # Current player
+    # Current player text
     player = "White" if board.current_player == 1 else "Black"
     text = font.render(f"Current player: {player}", True, (0, 0, 0))
     window.blit(text, (WIDTH - 250, HEIGHT - 50))
