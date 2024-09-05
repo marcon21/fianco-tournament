@@ -4,9 +4,10 @@ from pygame.locals import *
 import string
 from copy import deepcopy
 from random import random
-from time import time, sleep
+import time
+import numba
 
-from functools import lru_cache
+from functools import wraps
 
 CELL_SIZE = 100
 RADIUS = CELL_SIZE / 2 - 5
@@ -65,6 +66,17 @@ class Board:
 
     def calculate_legal_moves(self):
         self.legal_moves = self.get_all_possible_moves(self.current_player)
+
+    def load_moves(self, file: string):
+        with open(file, "r") as f:
+            lines = f.readlines()
+            for line in lines:
+                self.move(line.strip())
+
+    def save_moves(self, file: string):
+        with open(file, "w") as f:
+            for move in self.past_moves:
+                f.write(f"{move}\n")
 
     def get_all_possible_moves(self, player):
         legal_moves = {}
@@ -342,8 +354,8 @@ class Engine:
             )
 
         return (
-            (material_diff * 0.5) + (avg_ones * 0.25) - (avg_twos * 0.25) + game_over
-        ) * (1 if board.current_player == 1 else -1)
+            (material_diff * 0.5) + (avg_ones * 0.5) - (avg_twos * 0.5) + game_over
+        ) * (1 if self.player == 1 else -1)
 
     def get_best_move(self, board: Board, depth=3):
         best_eval = -np.inf
@@ -357,6 +369,7 @@ class Engine:
                 if eval > best_eval:
                     best_eval = eval
                     best_move = f"{board.convert_coord_to_str(piece)}-{board.convert_coord_to_str(move)}"
+
         return best_move
 
     def minimax(self, board: Board, depth, is_maximizing):
@@ -443,6 +456,7 @@ while not board.is_game_over():
     # Draw board
     board.draw_board(window, active_piece=current_selection)
     board.print_history(window)
+
     if current_selection:
         board.draw_possible_moves(window, current_selection)
 
@@ -469,23 +483,20 @@ while not board.is_game_over():
     pygame.display.flip()
 
     depth = 3
-
     print(f"Player {player} Evaluating...")
-    start_time = time()
+    start_time = time.time()
 
     if board.current_player == 1:
         best_move = engine.get_best_move(board, depth=depth)
-        # pass
     else:
         best_move = engine_black.get_best_move(board, depth=depth)
 
-    print(f"Time taken: {time()-start_time}")
+    print(f"Time taken: {time.time()-start_time}")
     print(best_move)
     board.move(best_move)
-
-    # current_board_eval = engine.evaluate(board, debug=True)
 
     dt = clock.tick(FPS) / 1000
 
 print("Game Over")
-sleep(10000)
+print(f"Player {player} wins")
+board.save_moves("moves.txt")
