@@ -2,12 +2,8 @@ import numpy as np
 import pygame
 from pygame.locals import *
 import string
-from copy import deepcopy
 from random import random
 import time
-import numba
-
-from functools import wraps
 
 CELL_SIZE = 100
 RADIUS = CELL_SIZE / 2 - 5
@@ -387,18 +383,20 @@ class Engine:
 
         ones, _ = np.where(board.board == 1)
         twos, _ = np.where(board.board == 2)
-        avg_ones = np.mean(8 - ones) / 9
+        ones = 9 - ones
+        twos = twos + 1
+        avg_ones = np.mean(ones) / 9
         avg_twos = np.mean(twos) / 9
 
         game_over = board.is_game_over() * 100
 
         if debug:
             print(
-                f"Material diff: {material_diff}, First row with 1: {avg_ones}, Last row with 2: {avg_twos}, Game over: {game_over}, ones: {8-ones}, twos: {twos}"
+                f"Material diff: {material_diff}, Avg 1: {avg_ones}, Avg 2: {avg_twos}, Game over: {game_over}, ones: {ones}, twos: {twos}"
             )
 
         return (
-            (material_diff * 0.5) + (avg_ones * 0.5) - (avg_twos * 0.5) + game_over
+            (material_diff * 0.5) + (avg_ones * 0.1) - (avg_twos * 0.1) + game_over
         ) * (1 if self.player == 1 else -1)
 
     def get_best_move(self, board: Board, depth=3):
@@ -455,6 +453,7 @@ engine = Engine(player=1)
 engine_black = Engine(player=2)
 current_selection = None
 current_board_eval = engine.evaluate(board)
+move_count = 0
 
 while not board.is_game_over():
     for event in pygame.event.get():
@@ -536,8 +535,15 @@ while not board.is_game_over():
     window.blit(text, (9 * CELL_SIZE + 30, HEIGHT - 90))
 
     pygame.display.flip()
+    time.sleep(1)
 
-    depth = 5
+    if move_count < 10:
+        depth = 3
+    elif move_count < 20:
+        depth = 4
+    else:
+        depth = 5
+
     print(f"Player {player} Evaluating...")
     start_time = time.time()
 
@@ -550,7 +556,10 @@ while not board.is_game_over():
     print(best_move)
     board.move(best_move)
 
+    current_board_eval = engine.evaluate(board)
+
     # exit()
+    move_count += 1
 
     dt = clock.tick(FPS) / 1000
 
