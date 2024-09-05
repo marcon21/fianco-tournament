@@ -25,6 +25,9 @@ pygame.display.set_caption(GAME_TITLE)
 pygame.font.init()
 font = pygame.font.SysFont("Arial", 24)
 
+all_legal_moves_one = {}
+all_legal_moves_two = {}
+
 
 class Board:
     def __init__(self):
@@ -65,6 +68,23 @@ class Board:
         self.board = board
 
     def calculate_legal_moves(self):
+        # if self.current_player == 1:
+        #     if self.board.tobytes() in all_legal_moves_one:
+        #         self.legal_moves = all_legal_moves_one[self.board.tobytes()]
+        #     else:
+        #         self.legal_moves = self.get_all_possible_moves(self.current_player)
+        #         all_legal_moves_one[self.board.tobytes()] = self.legal_moves
+
+        #     if len(all_legal_moves_one) > 250000:
+        #         all_legal_moves_one.pop(next(iter(all_legal_moves_one)))
+        # else:
+        #     if self.board.tobytes() in all_legal_moves_two:
+        #         self.legal_moves = all_legal_moves_two[self.board.tobytes()]
+        #     else:
+        #         self.legal_moves = self.get_all_possible_moves(self.current_player)
+        #         all_legal_moves_two[self.board.tobytes()] = self.legal_moves
+        #     if len(all_legal_moves_two) > 250000:
+        #         all_legal_moves_two.pop(next(iter(all_legal_moves_two)))
         self.legal_moves = self.get_all_possible_moves(self.current_player)
 
     def load_moves(self, file: string):
@@ -107,6 +127,7 @@ class Board:
 
         return legal_moves
 
+    # @profile
     def get_possible_moves(self, piece):
         if type(piece) == str:
             piece = self.convert_coord_to_abs(piece)
@@ -176,6 +197,29 @@ class Board:
         self.past_moves.append(move)
         self.current_player = self.current_player % 2 + 1
 
+        self.calculate_legal_moves()
+
+    def undo_move(self):
+        if not self.past_moves:
+            return
+
+        move = self.past_moves.pop()
+        if type(move) == str:
+            start = self.convert_coord_to_abs(move[:2])
+            end = self.convert_coord_to_abs(move[3:])
+        else:
+            start = move[0]
+            end = move[1]
+
+        if abs(start[0] - end[0]) > 1:
+            self.board[(start[0] + end[0]) // 2, (start[1] + end[1]) // 2] = (
+                self.current_player
+            )
+
+        self.board[start[0], start[1]] = self.board[end[0], end[1]]
+        self.board[end[0], end[1]] = 0
+
+        self.current_player = self.current_player % 2 + 1
         self.calculate_legal_moves()
 
     def convert_coord_to_abs(self, pos: string):
@@ -360,19 +404,21 @@ class Engine:
     def get_best_move(self, board: Board, depth=3):
         best_eval = -np.inf
         best_move = None
+        alpha = -np.inf
+        beta = np.inf
         for piece, moves in board.legal_moves.items():
             piece = [int(piece[0]), int(piece[1])]
             for move in moves:
-                new_board = deepcopy(board)
-                new_board.move((piece, move))
-                eval = self.minimax(new_board, depth, False)
+                board.move((piece, move))
+                eval = self.minimax(board, depth - 1, False, alpha, beta)
                 if eval > best_eval:
                     best_eval = eval
                     best_move = f"{board.convert_coord_to_str(piece)}-{board.convert_coord_to_str(move)}"
+                board.undo_move()
 
         return best_move
 
-    def minimax(self, board: Board, depth, is_maximizing):
+    def minimax(self, board: Board, depth, is_maximizing, alpha, beta):
         if depth == 0:
             return self.evaluate(board)
 
@@ -381,20 +427,26 @@ class Engine:
             for piece, moves in board.legal_moves.items():
                 piece = [int(piece[0]), int(piece[1])]
                 for move in moves:
-                    new_board = deepcopy(board)
-                    new_board.move((piece, move))
-                    eval = self.minimax(new_board, depth - 1, False)
+                    board.move((piece, move))
+                    eval = self.minimax(board, depth - 1, False, alpha, beta)
                     best_eval = max(best_eval, eval)
+                    alpha = max(alpha, eval)
+                    board.undo_move()
+                    if beta <= alpha:
+                        break
             return best_eval
         else:
             best_eval = np.inf
             for piece, moves in board.legal_moves.items():
                 piece = [int(piece[0]), int(piece[1])]
                 for move in moves:
-                    new_board = deepcopy(board)
-                    new_board.move((piece, move))
-                    eval = self.minimax(new_board, depth - 1, True)
+                    board.move((piece, move))
+                    eval = self.minimax(board, depth - 1, True, alpha, beta)
                     best_eval = min(best_eval, eval)
+                    beta = min(beta, eval)
+                    board.undo_move()
+                    if beta <= alpha:
+                        break
             return best_eval
 
 
@@ -421,6 +473,9 @@ while not board.is_game_over():
                 print(f"Time taken: {time()-start_time}")
                 print(best_move)
                 board.move(best_move)
+                current_board_eval = engine.evaluate(board)
+            elif event.key == K_u:
+                board.undo_move()
                 current_board_eval = engine.evaluate(board)
 
         if event.type == MOUSEBUTTONDOWN:
@@ -482,7 +537,7 @@ while not board.is_game_over():
 
     pygame.display.flip()
 
-    depth = 3
+    depth = 5
     print(f"Player {player} Evaluating...")
     start_time = time.time()
 
@@ -494,6 +549,8 @@ while not board.is_game_over():
     print(f"Time taken: {time.time()-start_time}")
     print(best_move)
     board.move(best_move)
+
+    # exit()
 
     dt = clock.tick(FPS) / 1000
 
