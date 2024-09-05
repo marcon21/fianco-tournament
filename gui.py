@@ -4,6 +4,9 @@ from pygame.locals import *
 import string
 from copy import deepcopy
 from random import random
+from time import time, sleep
+
+from functools import lru_cache
 
 CELL_SIZE = 100
 RADIUS = CELL_SIZE / 2 - 5
@@ -66,29 +69,29 @@ class Board:
     def get_all_possible_moves(self, player):
         legal_moves = {}
         self.capturers = []
+
         for i in range(9):
             for j in range(9):
                 if self.board[i, j] == player:
                     moves = self.get_possible_moves([i, j])
-                    legal_moves[f"{i}{j}"] = []
-                    only_captures = []
+                    legal_moves[f"{i}{j}"] = moves
+
+                    capture_move = []
                     for move in moves:
                         if abs(i - move[0]) > 1:
-                            only_captures.append(move)
+                            capture_move.append(move)
 
-                    if only_captures:
-                        legal_moves[f"{i}{j}"] = only_captures
+                    if capture_move:
                         self.capturers.append([i, j])
-                    else:
-                        legal_moves[f"{i}{j}"] = moves
+                        legal_moves[f"{i}{j}"] = capture_move
 
-        new_legal_moves = {}
-        for capturer in self.capturers:
-            new_legal_moves[f"{capturer[0]}{capturer[1]}"] = legal_moves[
-                f"{capturer[0]}{capturer[1]}"
-            ]
-        if new_legal_moves:
-            return new_legal_moves
+        if self.capturers:
+            only_captures = {}
+            for capturer in self.capturers:
+                only_captures[f"{capturer[0]}{capturer[1]}"] = legal_moves[
+                    f"{capturer[0]}{capturer[1]}"
+                ]
+            return only_captures
 
         return legal_moves
 
@@ -131,7 +134,7 @@ class Board:
         valid_moves = []
         for move in moves:
             # Check if move is within bounds
-            if 0 < move[0] < 9 and 0 < move[1] < 9:
+            if 0 <= move[0] < 9 and 0 <= move[1] < 9:
                 # End position is empty
                 if self.board[move[0], move[1]] == 0:
                     valid_moves.append(move)
@@ -176,7 +179,8 @@ class Board:
         if 1 in self.board[0, :]:
             return 1
         if 2 in self.board[8, :]:
-            return 2
+            return -1
+        return 0
 
     def is_move_valid(self, start, end):
         if self.board[start[0], start[1]] != self.current_player:
@@ -320,12 +324,26 @@ class Engine:
         self.player = player
         self.max_eval = 15
 
-    def evaluate(self, board: Board, randomize=False):
+    def evaluate(self, board: Board, randomize=False, debug=False):
         unique, counts = np.unique(board.board, return_counts=True)
         count_dict = dict(zip(unique, counts))
         material_diff = count_dict[1] - count_dict[2]
 
-        return material_diff
+        ones, _ = np.where(board.board == 1)
+        twos, _ = np.where(board.board == 2)
+        avg_ones = np.mean(8 - ones) / 9
+        avg_twos = np.mean(twos) / 9
+
+        game_over = board.is_game_over() * 100
+
+        if debug:
+            print(
+                f"Material diff: {material_diff}, First row with 1: {avg_ones}, Last row with 2: {avg_twos}, Game over: {game_over}, ones: {8-ones}, twos: {twos}"
+            )
+
+        return (
+            (material_diff * 0.5) + (avg_ones * 0.25) - (avg_twos * 0.25) + game_over
+        ) * (1 if board.current_player == 1 else -1)
 
     def get_best_move(self, board: Board, depth=3):
         best_eval = -np.inf
@@ -368,11 +386,12 @@ class Engine:
 
 
 board = Board()
-engine = Engine()
+engine = Engine(player=1)
+engine_black = Engine(player=2)
 current_selection = None
 current_board_eval = engine.evaluate(board)
 
-while True:
+while not board.is_game_over():
     for event in pygame.event.get():
         if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
             pygame.quit()
@@ -383,7 +402,10 @@ while True:
                 current_selection = None
                 current_board_eval = engine.evaluate(board)
             elif event.key == K_e:
+                print("Evaluating...")
+                start_time = time()
                 best_move = engine.get_best_move(board, depth=3)
+                print(f"Time taken: {time()-start_time}")
                 print(best_move)
                 board.move(best_move)
                 current_board_eval = engine.evaluate(board)
@@ -439,11 +461,31 @@ while True:
     #     (9 * CELL_SIZE + 20, mapped_value, 50, (HEIGHT - 100) - (mapped_value + 0)),
     # )
     # pygame.draw.rect(window, (0, 0, 0), (9 * CELL_SIZE + 20, 100, 50, HEIGHT - 200), 5)
-    # text = font.render(
-    #     f"{'+' if current_board_eval>=0 else ' '}{current_board_eval}", True, (0, 0, 0)
-    # )
-    # window.blit(text, (9 * CELL_SIZE + 30, HEIGHT - 90))
+    text = font.render(
+        f"{'+' if current_board_eval>=0 else ' '}{current_board_eval}", True, (0, 0, 0)
+    )
+    window.blit(text, (9 * CELL_SIZE + 30, HEIGHT - 90))
 
     pygame.display.flip()
 
+    depth = 3
+
+    print(f"Player {player} Evaluating...")
+    start_time = time()
+
+    if board.current_player == 1:
+        best_move = engine.get_best_move(board, depth=depth)
+        # pass
+    else:
+        best_move = engine_black.get_best_move(board, depth=depth)
+
+    print(f"Time taken: {time()-start_time}")
+    print(best_move)
+    board.move(best_move)
+
+    # current_board_eval = engine.evaluate(board, debug=True)
+
     dt = clock.tick(FPS) / 1000
+
+print("Game Over")
+sleep(10000)
