@@ -4,6 +4,7 @@ from pygame.locals import *
 import string
 from random import random
 import time
+import numba
 
 CELL_SIZE = 100
 RADIUS = CELL_SIZE / 2 - 5
@@ -95,6 +96,7 @@ class Board:
             for move in self.past_moves:
                 f.write(f"{move}\n")
 
+    # @profile
     def get_all_possible_moves(self, player):
         legal_moves = {}
         self.capturers = []
@@ -236,7 +238,7 @@ class Board:
         if 1 in self.board[0, :]:
             return 1
         if 2 in self.board[8, :]:
-            return -1
+            return 2
         return 0
 
     def is_move_valid(self, start, end):
@@ -375,30 +377,41 @@ class Board:
                 CELL_SIZE / 8,
             )
 
+    def __hash__(self):
+        return hash(self.board.tobytes())
+
 
 class Engine:
     def __init__(self, player=1):
         self.player = player
         self.max_eval = 15
+        self.transposition_table = {}
 
+    # @profile
     def evaluate(self, board: Board, randomize=False, debug=False):
-        unique, counts = np.unique(board.board, return_counts=True)
-        count_dict = dict(zip(unique, counts))
-        material_diff = count_dict[1] - count_dict[2]
-
         ones, _ = np.where(board.board == 1)
         twos, _ = np.where(board.board == 2)
+
+        material_diff = ones.size - twos.size
+        game_over = 0
+        if 0 in ones:
+            return 100 * (1 if self.player == 1 else -1)
+        elif 8 in twos:
+            return 100 * (1 if self.player == 2 else -1)
+
         ones = 9 - ones
         twos = twos + 1
-        avg_ones = np.mean(ones) / 9
-        avg_twos = np.mean(twos) / 9
+        avg_ones = ones.mean()
+        avg_twos = twos.mean()
 
         if debug:
             print(
                 f"Material diff: {material_diff}, Avg 1: {avg_ones}, Avg 2: {avg_twos}, ones: {ones}, twos: {twos}"
             )
 
-        return (material_diff * 0.5) + (avg_ones * 0.1) - (avg_twos * 0.1)
+        return ((material_diff * 1) + (avg_ones * 1) - (avg_twos * 1)) * (
+            1 if self.player == 1 else -1
+        )
 
     def get_best_move(self, board: Board, depth=3):
         best_eval = -np.inf
@@ -418,11 +431,18 @@ class Engine:
                 if alpha >= beta:
                     break
 
+        print(f"Expected eval: {best_eval}")
         return best_move
 
     def negamax(self, board: Board, depth, alpha, beta):
+        board_hash = hash(board)
+        if board_hash in self.transposition_table:
+            return self.transposition_table[board_hash]
+
         if depth == 0 or board.is_game_over():
-            return self.evaluate(board) * (1 if self.player == 1 else -1)
+            eval = self.evaluate(board)
+            self.transposition_table[board_hash] = eval
+            return eval
 
         best_eval = -np.inf
         for piece, moves in board.legal_moves.items():
@@ -436,6 +456,7 @@ class Engine:
                 if alpha >= beta:
                     break
 
+        self.transposition_table[board_hash] = best_eval
         return best_eval
 
 
@@ -446,7 +467,7 @@ current_selection = None
 current_board_eval = engine.evaluate(board)
 move_count = 0
 
-while not board.is_game_over():
+while True:
     for event in pygame.event.get():
         if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
             pygame.quit()
@@ -526,18 +547,20 @@ while not board.is_game_over():
     window.blit(text, (9 * CELL_SIZE + 30, HEIGHT - 90))
 
     pygame.display.flip()
+
+    if board.is_game_over():
+        print("Game Over")
+        player = "White" if board.current_player == 2 else "Black"
+        print(f"Player {player} wins")
+        board.save_moves("moves.txt")
+        while True:
+            pass
+
+    if board.current_player == 2:
+        continue
+
     time.sleep(1)
-
-    if move_count < 10:
-        depth = 4
-    elif move_count < 30:
-        depth = 4
-    elif move_count < 50:
-        depth = 5
-    else:
-        depth = 4
-
-    # depth = 5
+    depth = 6
 
     print(f"Player {player} Evaluating... depth: {depth}")
     start_time = time.time()
@@ -552,12 +575,6 @@ while not board.is_game_over():
     board.move(best_move)
 
     current_board_eval = engine.evaluate(board)
-
-    # exit()
     move_count += 1
 
     dt = clock.tick(FPS) / 1000
-
-print("Game Over")
-print(f"Player {player} wins")
-board.save_moves("moves.txt")
