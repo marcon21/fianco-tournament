@@ -31,6 +31,7 @@ class Board:
         self.legal_moves = {}
         self.current_player = 1
         self.past_moves = []
+        self.past_legal_moves = []
 
         self.calculate_legal_moves()
 
@@ -191,6 +192,7 @@ class Board:
         self.board[start[0], start[1]] = 0
 
         self.past_moves.append(move)
+        self.past_legal_moves.append(self.legal_moves)
         self.current_player = self.current_player % 2 + 1
 
         self.calculate_legal_moves()
@@ -216,7 +218,10 @@ class Board:
         self.board[end[0], end[1]] = 0
 
         self.current_player = self.current_player % 2 + 1
-        self.calculate_legal_moves()
+
+        self.legal_moves = self.past_legal_moves.pop()
+
+        # self.calculate_legal_moves()
 
     def convert_coord_to_abs(self, pos: string):
         # Pos in format A1 to (8, 0)
@@ -388,16 +393,12 @@ class Engine:
         avg_ones = np.mean(ones) / 9
         avg_twos = np.mean(twos) / 9
 
-        game_over = board.is_game_over() * 100
-
         if debug:
             print(
-                f"Material diff: {material_diff}, Avg 1: {avg_ones}, Avg 2: {avg_twos}, Game over: {game_over}, ones: {ones}, twos: {twos}"
+                f"Material diff: {material_diff}, Avg 1: {avg_ones}, Avg 2: {avg_twos}, ones: {ones}, twos: {twos}"
             )
 
-        return (
-            (material_diff * 0.5) + (avg_ones * 0.1) - (avg_twos * 0.1) + game_over
-        ) * (1 if self.player == 1 else -1)
+        return (material_diff * 0.5) + (avg_ones * 0.1) - (avg_twos * 0.1)
 
     def get_best_move(self, board: Board, depth=3):
         best_eval = -np.inf
@@ -408,44 +409,34 @@ class Engine:
             piece = [int(piece[0]), int(piece[1])]
             for move in moves:
                 board.move((piece, move))
-                eval = self.minimax(board, depth - 1, False, alpha, beta)
+                eval = -self.negamax(board, depth - 1, -beta, -alpha)
                 if eval > best_eval:
                     best_eval = eval
                     best_move = f"{board.convert_coord_to_str(piece)}-{board.convert_coord_to_str(move)}"
+                alpha = max(alpha, eval)
                 board.undo_move()
+                if alpha >= beta:
+                    break
 
         return best_move
 
-    def minimax(self, board: Board, depth, is_maximizing, alpha, beta):
-        if depth == 0:
-            return self.evaluate(board)
+    def negamax(self, board: Board, depth, alpha, beta):
+        if depth == 0 or board.is_game_over():
+            return self.evaluate(board) * (1 if self.player == 1 else -1)
 
-        if is_maximizing:
-            best_eval = -np.inf
-            for piece, moves in board.legal_moves.items():
-                piece = [int(piece[0]), int(piece[1])]
-                for move in moves:
-                    board.move((piece, move))
-                    eval = self.minimax(board, depth - 1, False, alpha, beta)
-                    best_eval = max(best_eval, eval)
-                    alpha = max(alpha, eval)
-                    board.undo_move()
-                    if beta <= alpha:
-                        break
-            return best_eval
-        else:
-            best_eval = np.inf
-            for piece, moves in board.legal_moves.items():
-                piece = [int(piece[0]), int(piece[1])]
-                for move in moves:
-                    board.move((piece, move))
-                    eval = self.minimax(board, depth - 1, True, alpha, beta)
-                    best_eval = min(best_eval, eval)
-                    beta = min(beta, eval)
-                    board.undo_move()
-                    if beta <= alpha:
-                        break
-            return best_eval
+        best_eval = -np.inf
+        for piece, moves in board.legal_moves.items():
+            piece = [int(piece[0]), int(piece[1])]
+            for move in moves:
+                board.move((piece, move))
+                eval = -self.negamax(board, depth - 1, -beta, -alpha)
+                best_eval = max(best_eval, eval)
+                alpha = max(alpha, eval)
+                board.undo_move()
+                if alpha >= beta:
+                    break
+
+        return best_eval
 
 
 board = Board()
@@ -538,13 +529,17 @@ while not board.is_game_over():
     time.sleep(1)
 
     if move_count < 10:
-        depth = 3
-    elif move_count < 20:
         depth = 4
-    else:
+    elif move_count < 30:
+        depth = 4
+    elif move_count < 50:
         depth = 5
+    else:
+        depth = 4
 
-    print(f"Player {player} Evaluating...")
+    # depth = 5
+
+    print(f"Player {player} Evaluating... depth: {depth}")
     start_time = time.time()
 
     if board.current_player == 1:
