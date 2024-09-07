@@ -3,8 +3,9 @@ import pygame
 from pygame.locals import *
 import string
 from random import random
-import time
+from time import time, sleep
 import numba
+from pprint import pprint
 
 CELL_SIZE = 100
 RADIUS = CELL_SIZE / 2 - 5
@@ -83,6 +84,10 @@ class Board:
         #         all_legal_moves_two[self.board.tobytes()] = self.legal_moves
         #     if len(all_legal_moves_two) > 250000:
         #         all_legal_moves_two.pop(next(iter(all_legal_moves_two)))
+
+        if self.is_game_over():
+            self.legal_moves = {}
+            return
         self.legal_moves = self.get_all_possible_moves(self.current_player)
 
     def load_moves(self, file: string):
@@ -254,6 +259,8 @@ class Board:
         return True
 
     def draw_board(self, window, active_piece=None):
+        self.calculate_legal_moves()
+
         for i in range(9):
             pygame.draw.line(
                 window,
@@ -378,118 +385,198 @@ class Board:
             )
 
     def __hash__(self):
-        return hash(self.board.tobytes())
+        return self.board.tobytes()
 
 
 class Engine:
-    def __init__(self, player=1):
+    def __init__(self, player=1, depth=3, max_time=0):
         self.player = player
         self.max_eval = 15
         self.transposition_table = {}
+        self.depth = depth
+        self.max_time = max_time
+        self.start_time = time()
 
-    # @profile
     def evaluate(self, board: Board, randomize=False, debug=False):
+        player_prospective = (1 if board.current_player == self.player else -1) * (
+            1 if self.player == 1 else -1
+        )
+
         ones, _ = np.where(board.board == 1)
         twos, _ = np.where(board.board == 2)
 
         material_diff = ones.size - twos.size
-        game_over = 0
         if 0 in ones:
-            return 100 * (1 if self.player == 1 else -1)
+            return 1000 * player_prospective
         elif 8 in twos:
-            return 100 * (1 if self.player == 2 else -1)
+            return -1000 * player_prospective
 
         ones = 9 - ones
         twos = twos + 1
-        avg_ones = ones.mean()
-        avg_twos = twos.mean()
+        twos = twos[::-1]
+
+        avg_ones = np.average(ones, weights=range(ones.size + 1, 1, -1))
+        avg_twos = np.average(twos, weights=range(twos.size + 1, 1, -1))
 
         if debug:
             print(
                 f"Material diff: {material_diff}, Avg 1: {avg_ones}, Avg 2: {avg_twos}, ones: {ones}, twos: {twos}"
             )
 
-        return ((material_diff * 1) + (avg_ones * 1) - (avg_twos * 1)) * (
-            1 if self.player == 1 else -1
-        )
+        return (
+            (material_diff * 5) + (avg_ones * 1) - (avg_twos * 1)
+        ) * player_prospective
 
-    def get_best_move(self, board: Board, depth=3):
+    def get_best_move(self, board: Board):
+        self.start_time = time()
         best_eval = -np.inf
         best_move = None
+        best_move_sequence = []
         alpha = -np.inf
         beta = np.inf
+
         for piece, moves in board.legal_moves.items():
-            piece = [int(piece[0]), int(piece[1])]
+            piece_coords = [int(piece[0]), int(piece[1])]
             for move in moves:
-                board.move((piece, move))
-                eval = -self.negamax(board, depth - 1, -beta, -alpha)
+                board.move((piece_coords, move))
+                eval, move_sequence = self.negamax(board, self.depth - 1, -beta, -alpha)
+                eval = -eval
                 if eval > best_eval:
                     best_eval = eval
-                    best_move = f"{board.convert_coord_to_str(piece)}-{board.convert_coord_to_str(move)}"
+                    best_move = (piece_coords, move)
+                    best_move_sequence = [
+                        f"{board.convert_coord_to_str(piece_coords)}-{board.convert_coord_to_str(move)}",
+                    ] + move_sequence
                 alpha = max(alpha, eval)
                 board.undo_move()
                 if alpha >= beta:
                     break
 
-        print(f"Expected eval: {best_eval}")
-        return best_move
+        # while len(self.transposition_table) > 100000:
+        #     self.transposition_table.pop(next(iter(self.transposition_table)))
+        self.transposition_table = {}
 
-    def negamax(self, board: Board, depth, alpha, beta):
-        board_hash = hash(board)
-        if board_hash in self.transposition_table:
+        if best_move:
+            best_move_str = f"{board.convert_coord_to_str(best_move[0])}-{board.convert_coord_to_str(best_move[1])}"
+            # pprint(
+            #     f"Expected eval: {best_eval}, Best move: {best_move_str}, Best move sequence: {best_move_sequence}"
+            # )
+            for move in best_move_sequence:
+                board.move(move)
+                print(
+                    f"{move}: {self.evaluate(board) * (1 if self.player == board.current_player else -1) * (1 if self.player == 1 else -1)}"
+                )
+
+            for _ in best_move_sequence:
+                board.undo_move()
+
+            return best_move_str
+
+        return None
+
+    def negamax(self, board: Board, depth, alpha, beta, hash_table=True):
+        board_hash = str(board.board.tobytes())
+        if hash_table and board_hash in self.transposition_table:
             return self.transposition_table[board_hash]
 
-        if depth == 0 or board.is_game_over():
+        if (
+            depth == 0
+            or board.is_game_over()
+            or (self.max_time and (time() - self.start_time) > self.max_time)
+        ):
             eval = self.evaluate(board)
-            self.transposition_table[board_hash] = eval
-            return eval
+            self.transposition_table[board_hash] = (eval, [])
+            return eval, []
 
         best_eval = -np.inf
+        best_move_sequence = []
+
         for piece, moves in board.legal_moves.items():
-            piece = [int(piece[0]), int(piece[1])]
+            piece_coords = [int(piece[0]), int(piece[1])]
             for move in moves:
-                board.move((piece, move))
-                eval = -self.negamax(board, depth - 1, -beta, -alpha)
-                best_eval = max(best_eval, eval)
+                board.move((piece_coords, move))
+                eval, move_sequence = self.negamax(board, depth - 1, -beta, -alpha)
+                eval = -eval
+                if eval > best_eval:
+                    best_eval = eval
+                    best_move_sequence = [
+                        f"{board.convert_coord_to_str(piece_coords)}-{board.convert_coord_to_str(move)}",
+                    ] + move_sequence
                 alpha = max(alpha, eval)
                 board.undo_move()
                 if alpha >= beta:
                     break
 
-        self.transposition_table[board_hash] = best_eval
-        return best_eval
+        self.transposition_table[board_hash] = (best_eval, best_move_sequence)
+        return best_eval, best_move_sequence
 
 
 board = Board()
-engine = Engine(player=1)
-engine_black = Engine(player=2)
+depth = 6
+max_time = 0
+engine_white = Engine(player=1, depth=depth, max_time=max_time)
+engine_black = Engine(player=2, depth=depth, max_time=max_time)
+current_board_eval = engine_white.evaluate(board)
+
 current_selection = None
-current_board_eval = engine.evaluate(board)
 move_count = 0
 
+
+def think_best_move(board):
+    print(f"Player {player} Evaluating...")
+    start_time = time()
+    if board.current_player == 1:
+        best_move = engine_white.get_best_move(board)
+    else:
+        best_move = engine_black.get_best_move(board)
+    print(f"Time taken: {time()-start_time:.2f}, Move: {best_move}")
+    return best_move
+
+
 while True:
+    player = "White" if board.current_player == 1 else "Black"
+
+    # assert engine_white.evaluate(board) == -engine_black.evaluate(board), (
+    #     engine_white.evaluate(board),
+    #     engine_black.evaluate(board),
+    # )
+
     for event in pygame.event.get():
         if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
             pygame.quit()
             exit()
         if event.type == KEYDOWN:
             if event.key == K_r:
+                # Reset board
                 board = Board()
                 current_selection = None
-                current_board_eval = engine.evaluate(board)
+                current_board_eval = engine_white.evaluate(board)
             elif event.key == K_e:
-                print("Evaluating...")
-                start_time = time()
-                best_move = engine.get_best_move(board, depth=3)
-                print(f"Time taken: {time()-start_time}")
-                print(best_move)
+                # Evaluate with engine and make move
+                best_move = think_best_move(board)
                 board.move(best_move)
-                current_board_eval = engine.evaluate(board)
+                current_board_eval = engine_white.evaluate(board)
+            elif event.key == K_t:
+                # Think and print best move
+                best_move = think_best_move(board)
             elif event.key == K_u:
+                # Undo move
                 board.undo_move()
-                current_board_eval = engine.evaluate(board)
-
+                current_board_eval = engine_white.evaluate(board)
+                current_selection = None
+                move_count -= 1
+            elif event.key == K_UP:
+                depth += 1
+                print(f"Depth: {depth}")
+                engine_white = Engine(player=1, depth=depth)
+                engine_black = Engine(player=2, depth=depth)
+            elif event.key == K_DOWN:
+                depth -= 1
+                print(f"Depth: {depth}")
+                engine_white = Engine(player=1, depth=depth)
+                engine_black = Engine(player=2, depth=depth)
         if event.type == MOUSEBUTTONDOWN:
+            # Manual Move
             pos = pygame.mouse.get_pos()
             x, y = pos
             x = x // CELL_SIZE
@@ -510,7 +597,7 @@ while True:
                     board.move(
                         f"{board.convert_coord_to_str(current_selection)}-{board.convert_coord_to_str(new_selection)}"
                     )
-                    current_board_eval = engine.evaluate(board)
+                    current_board_eval = engine_white.evaluate(board)
 
                 current_selection = None
             else:
@@ -527,20 +614,10 @@ while True:
         board.draw_possible_moves(window, current_selection)
 
     # Current player text
-    player = "White" if board.current_player == 1 else "Black"
     text = font.render(f"Current player: {player}", True, (0, 0, 0))
     window.blit(text, (WIDTH - 270, HEIGHT - 40))
 
     # Evaluation Bar
-    # mapped_value = np.interp(
-    #     -current_board_eval, [-engine.max_eval, engine.max_eval], [100, (HEIGHT - 100)]
-    # )
-    # pygame.draw.rect(
-    #     window,
-    #     (0, 255, 0),
-    #     (9 * CELL_SIZE + 20, mapped_value, 50, (HEIGHT - 100) - (mapped_value + 0)),
-    # )
-    # pygame.draw.rect(window, (0, 0, 0), (9 * CELL_SIZE + 20, 100, 50, HEIGHT - 200), 5)
     text = font.render(
         f"{'+' if current_board_eval>=0 else ' '}{current_board_eval}", True, (0, 0, 0)
     )
@@ -552,29 +629,11 @@ while True:
         print("Game Over")
         player = "White" if board.current_player == 2 else "Black"
         print(f"Player {player} wins")
-        board.save_moves("moves.txt")
         while True:
             pass
 
-    # if board.current_player == 2:
-    #     continue
-
-    time.sleep(1)
-    depth = 5
-
-    print(f"Player {player} Evaluating... depth: {depth}")
-    start_time = time.time()
-
-    if board.current_player == 1:
-        best_move = engine.get_best_move(board, depth=depth)
-    else:
-        best_move = engine_black.get_best_move(board, depth=depth)
-
-    print(f"Time taken: {time.time()-start_time}")
-    print(best_move)
+    best_move = think_best_move(board)
     board.move(best_move)
-
-    current_board_eval = engine.evaluate(board)
-    move_count += 1
+    sleep(1)
 
     dt = clock.tick(FPS) / 1000
