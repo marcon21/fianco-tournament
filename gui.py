@@ -556,11 +556,11 @@ while True:
         while True:
             pass
 
-    if board.current_player == 2:
-        continue
+    # if board.current_player == 2:
+    #     continue
 
     time.sleep(1)
-    depth = 6
+    depth = 5
 
     print(f"Player {player} Evaluating... depth: {depth}")
     start_time = time.time()

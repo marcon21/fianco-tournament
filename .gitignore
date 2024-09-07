@@ -1,3 +1,10 @@
+gui.py.lprof
+moves copy.txt
+moves.txt
+game.txt
+
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
