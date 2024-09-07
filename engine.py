@@ -13,7 +13,7 @@ class Engine:
         self.max_time = max_time
         self.start_time = time()
 
-    def evaluate(self, board: Board, randomize=False, debug=False):
+    def evaluate(self, board: Board):
         player_prospective = (1 if board.current_player == self.player else -1) * (
             1 if self.player == 1 else -1
         )
@@ -33,11 +33,6 @@ class Engine:
 
         avg_ones = np.average(ones, weights=range(ones.size + 1, 1, -1))
         avg_twos = np.average(twos, weights=range(twos.size + 1, 1, -1))
-
-        if debug:
-            print(
-                f"Material diff: {material_diff}, Avg 1: {avg_ones}, Avg 2: {avg_twos}, ones: {ones}, twos: {twos}"
-            )
 
         return (
             (material_diff * 5) + (avg_ones * 1) - (avg_twos * 1)

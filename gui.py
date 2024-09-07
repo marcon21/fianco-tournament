@@ -17,10 +17,8 @@ font = pygame.font.SysFont("Arial", 24)
 
 
 board = Board()
-depth = 6
-max_time = 0
-engine_white = Engine(player=1, depth=depth, max_time=max_time)
-engine_black = Engine(player=2, depth=depth, max_time=max_time)
+engine_white = Engine(player=1, depth=DEPTH, max_time=MAX_TIME)
+engine_black = Engine(player=2, depth=DEPTH, max_time=MAX_TIME)
 current_board_eval = engine_white.evaluate(board)
 
 current_selection = None
@@ -71,15 +69,16 @@ while True:
                 current_selection = None
                 move_count -= 1
             elif event.key == K_UP:
-                depth += 1
-                print(f"Depth: {depth}")
-                engine_white = Engine(player=1, depth=depth)
-                engine_black = Engine(player=2, depth=depth)
+                DEPTH += 1
+                print(f"Depth set to: {DEPTH}")
+                engine_white.depth = DEPTH
+                engine_black.depth = DEPTH
             elif event.key == K_DOWN:
-                depth -= 1
-                print(f"Depth: {depth}")
-                engine_white = Engine(player=1, depth=depth)
-                engine_black = Engine(player=2, depth=depth)
+                DEPTH -= 1
+                print(f"Depth set to: {DEPTH}")
+                engine_white.depth = DEPTH
+                engine_black.depth = DEPTH
+
         if event.type == MOUSEBUTTONDOWN:
             # Manual Move
             pos = pygame.mouse.get_pos()
@@ -139,6 +138,7 @@ while True:
 
     best_move = think_best_move(board)
     board.move(best_move)
+    current_board_eval = engine_white.evaluate(board)
     sleep(1)
 
     dt = clock.tick(FPS) / 1000
