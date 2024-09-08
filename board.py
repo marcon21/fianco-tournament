@@ -4,6 +4,7 @@ from pygame.locals import *
 import string
 from parameters import *
 
+
 pygame.font.init()
 font = pygame.font.SysFont("Arial", 24)
 
