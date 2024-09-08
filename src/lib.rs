@@ -17,6 +17,13 @@ impl Board {
         format!("{}{}", col, row)
     }
 
+    fn convert_str_to_coord(pos: &str) -> (i8, i8) {
+        // Pos in format A1 to (8, 0)
+        let col = (pos.chars().nth(0).unwrap() as i8) - 65;
+        let row = 9 - (pos.chars().nth(1).unwrap().to_digit(10).unwrap() as i8);
+        (row, col)
+    }
+
     fn is_game_over(&self) -> i8 {
         if self.board[0].contains(&1) {
             return 1;
@@ -214,7 +221,7 @@ impl Engine {
         let mut best_move: ((i8, i8), (i8, i8)) = ((0, 0), (0, 0));
         let mut best_move_sequence = Vec::new();
         let mut alpha = f64::NEG_INFINITY;
-        let mut beta = f64::INFINITY;
+        let beta = f64::INFINITY;
 
         for (piece, moves) in board.legal_moves.clone() {
             let piece_coords = (
@@ -258,6 +265,20 @@ impl Engine {
             Board::convert_coord_to_str(best_move.0),
             Board::convert_coord_to_str(best_move.1)
         );
+
+        for move_ in best_move_sequence.clone() {
+            let coords: Vec<&str> = move_.split('-').collect();
+            let start = Board::convert_str_to_coord(coords[0]);
+            let end = Board::convert_str_to_coord(coords[1]);
+            board.make_move(start, end);
+            println!(
+                "{}: {}",
+                move_,
+                self.evaluate(board) *
+                    (if self.player == board.current_player { 1.0 } else { -1.0 }) *
+                    (if self.player == 1 { 1.0 } else { -1.0 })
+            );
+        }
 
         return best_move_str;
     }

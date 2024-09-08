@@ -141,9 +141,11 @@ while True:
         while True:
             pass
 
-    best_move = think_best_move(board)
-    board.move(best_move)
+    # if board.current_player == 2:
+    #     best_move = think_best_move(board)
+    #     board.move(best_move)
+
     current_board_eval = engine_white.evaluate(board)
-    sleep(1)
+    # sleep(1)
 
     dt = clock.tick(FPS) / 1000
