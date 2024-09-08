@@ -1,0 +1,12 @@
+[package]
+name = "fianco-tournament"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "fianco_tournament"
+crate-type = ["cdylib"]
+
+[dependencies]
+numpy = "0.21.0"
+pyo3 = { version = "0.21", features = ["extension-module"] }

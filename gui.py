@@ -25,13 +25,18 @@ current_selection = None
 move_count = 0
 
 
+import fianco_tournament as ft
+
+
 def think_best_move(board):
     print(f"Player {player} Evaluating...")
     start_time = time()
     if board.current_player == 1:
-        best_move = engine_white.get_best_move(board)
+        # best_move = engine_white.get_best_move(board)
+        best_move = ft.get_best_move(board.board, board.current_player, DEPTH)
     else:
-        best_move = engine_black.get_best_move(board)
+        # best_move = engine_black.get_best_move(board)
+        best_move = ft.get_best_move(board.board, board.current_player, DEPTH)
     print(f"Time taken: {time()-start_time:.2f}, Move: {best_move}")
     return best_move
 

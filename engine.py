@@ -7,7 +7,6 @@ from board import Board
 class Engine:
     def __init__(self, player=1, depth=3, max_time=0):
         self.player = player
-        self.max_eval = 15
         self.transposition_table = {}
         self.depth = depth
         self.max_time = max_time
