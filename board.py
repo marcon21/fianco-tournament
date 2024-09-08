@@ -4,6 +4,8 @@ from pygame.locals import *
 import string
 from parameters import *
 
+from goengine import sum
+
 pygame.font.init()
 font = pygame.font.SysFont("Arial", 24)
 
