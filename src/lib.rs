@@ -230,14 +230,14 @@ impl Engine {
             );
             for move_ in moves {
                 board.make_move(piece_coords, move_);
-                let (eval, move_sequence) = self.negamax(
+                let (mut eval, move_sequence) = self.negamax(
                     board,
                     self.depth - 1,
                     -beta,
                     -alpha,
                     true
                 );
-                let eval = -eval;
+                eval = -eval;
                 if eval > best_eval {
                     best_eval = eval;
                     best_move = (piece_coords, move_);
@@ -316,14 +316,14 @@ impl Engine {
                 board.make_move(piece_coords, move_);
                 let new_alpha: f64 = -beta;
                 let new_beta: f64 = -alpha;
-                let (eval, move_sequence) = self.negamax(
+                let (mut eval, move_sequence) = self.negamax(
                     board,
                     depth - 1,
                     new_alpha,
                     new_beta,
                     hash_table
                 );
-                let eval = -eval;
+                eval = -eval;
                 if eval > best_eval {
                     best_eval = eval;
                     best_move_sequence = vec![
@@ -359,7 +359,7 @@ fn weighted_average(values: &Vec<usize>) -> f64 {
 }
 
 #[pyfunction]
-fn get_best_move(board: Vec<Vec<i8>>, player: i8, depth: i32) -> String {
+fn get_best_move(board: Vec<Vec<i8>>, board_current_plater: i8, player: i8, depth: i32) -> String {
     let mut engine = Engine {
         player,
         depth,
@@ -369,12 +369,31 @@ fn get_best_move(board: Vec<Vec<i8>>, player: i8, depth: i32) -> String {
         board: board.clone(),
         past_legal_moves: vec![],
         past_moves: vec![],
-        current_player: player,
+        current_player: board_current_plater,
         legal_moves: HashMap::new(),
     };
     board.calculate_legal_moves();
 
     engine.get_best_move(&mut board)
+}
+
+#[pyfunction]
+fn evaluate_stand_alone(board: Vec<Vec<i8>>, board_current_plater: i8, player: i8) -> f64 {
+    let engine = Engine {
+        player,
+        depth: 0,
+        transposition_table: HashMap::new(),
+    };
+    let mut board = Board {
+        board: board.clone(),
+        past_legal_moves: vec![],
+        past_moves: vec![],
+        current_player: board_current_plater,
+        legal_moves: HashMap::new(),
+    };
+    board.calculate_legal_moves();
+
+    return engine.evaluate(&board);
 }
 
 #[pymodule]
@@ -383,5 +402,6 @@ fn fianco_tournament(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // m.add_function(wrap_pyfunction!(get_all_possible_moves, m)?)?;
     // m.add_function(wrap_pyfunction!(calculate_legal_moves, m)?)?;
     m.add_function(wrap_pyfunction!(get_best_move, m)?)?;
+    m.add_function(wrap_pyfunction!(evaluate_stand_alone, m)?)?;
     Ok(())
 }

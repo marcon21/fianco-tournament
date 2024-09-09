@@ -33,10 +33,10 @@ def think_best_move(board):
     start_time = time()
     if board.current_player == 1:
         # best_move = engine_white.get_best_move(board)
-        best_move = ft.get_best_move(board.board, board.current_player, DEPTH)
+        best_move = ft.get_best_move(board.board, board.current_player, 1, DEPTH)
     else:
         # best_move = engine_black.get_best_move(board)
-        best_move = ft.get_best_move(board.board, board.current_player, DEPTH)
+        best_move = ft.get_best_move(board.board, board.current_player, 2, DEPTH)
     print(f"Time taken: {time()-start_time:.2f}, Move: {best_move}")
     return best_move
 
@@ -83,6 +83,17 @@ while True:
                 print(f"Depth set to: {DEPTH}")
                 engine_white.depth = DEPTH
                 engine_black.depth = DEPTH
+            elif event.key == K_q:
+                # Evaluate the position from all engines
+                print("Evaluating current position...")
+                print(f"White Python: {engine_white.evaluate(board)}")
+                print(f"Black Python: {engine_black.evaluate(board)}")
+                print(
+                    f"White Rust: {ft.evaluate_stand_alone(board.board, board.current_player, 1)}"
+                )
+                print(
+                    f"Black Rust: {ft.evaluate_stand_alone(board.board, board.current_player, 2)}"
+                )
 
         if event.type == MOUSEBUTTONDOWN:
             # Manual Move
@@ -134,12 +145,12 @@ while True:
 
     pygame.display.flip()
 
-    if board.is_game_over():
-        print("Game Over")
-        player = "White" if board.current_player == 2 else "Black"
-        print(f"Player {player} wins")
-        while True:
-            pass
+    # if board.is_game_over():
+    #     print("Game Over")
+    #     player = "White" if board.current_player == 2 else "Black"
+    #     print(f"Player {player} wins")
+    #     while True:
+    #         pass
 
     # if board.current_player == 2:
     #     best_move = think_best_move(board)
