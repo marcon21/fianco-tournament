@@ -45,6 +45,14 @@ class Board:
     def __str__(self):
         return str(self.board)
 
+    def __eq__(self, other: object) -> bool:
+        return self.board.tobytes() == other.board.tobytes() and isinstance(
+            other, Board
+        )
+
+    def __hash__(self) -> int:
+        return hash(self.board.tobytes())
+
     def set_board(self, board):
         self.board = board
 
@@ -65,7 +73,6 @@ class Board:
             for move in self.past_moves:
                 f.write(f"{move}\n")
 
-    # @profile
     def get_all_possible_moves(self, player):
         legal_moves = {}
         self.capturers = []

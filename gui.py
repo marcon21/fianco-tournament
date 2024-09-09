@@ -4,7 +4,9 @@ from pygame.locals import *
 from time import time, sleep
 from parameters import *
 from board import Board
-from engine import Engine
+
+import fianco_tournament as ft
+from functools import lru_cache
 
 pygame.init()
 window = pygame.display.set_mode(GAME_RES, HWACCEL | HWSURFACE | DOUBLEBUF)
@@ -17,25 +19,23 @@ font = pygame.font.SysFont("Arial", 24)
 
 
 board = Board()
-engine_white = Engine(player=1, depth=DEPTH, max_time=MAX_TIME)
-engine_black = Engine(player=2, depth=DEPTH, max_time=MAX_TIME)
-current_board_eval = engine_white.evaluate(board)
+
+evaluate_function = lru_cache(maxsize=1000)(
+    lambda board: round(ft.evaluate_stand_alone(board.board, 1, 1), 3)
+)
+
+current_board_eval = evaluate_function(board)
 
 current_selection = None
 move_count = 0
-
-
-import fianco_tournament as ft
 
 
 def think_best_move(board):
     print(f"Player {player} Evaluating...")
     start_time = time()
     if board.current_player == 1:
-        # best_move = engine_white.get_best_move(board)
         best_move = ft.get_best_move(board.board, board.current_player, 1, DEPTH)
     else:
-        # best_move = engine_black.get_best_move(board)
         best_move = ft.get_best_move(board.board, board.current_player, 2, DEPTH)
     print(f"Time taken: {time()-start_time:.2f}, Move: {best_move}")
     return best_move
@@ -43,11 +43,7 @@ def think_best_move(board):
 
 while True:
     player = "White" if board.current_player == 1 else "Black"
-
-    # assert engine_white.evaluate(board) == -engine_black.evaluate(board), (
-    #     engine_white.evaluate(board),
-    #     engine_black.evaluate(board),
-    # )
+    current_board_eval = evaluate_function(board)
 
     for event in pygame.event.get():
         if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
@@ -58,42 +54,24 @@ while True:
                 # Reset board
                 board = Board()
                 current_selection = None
-                current_board_eval = engine_white.evaluate(board)
             elif event.key == K_e:
                 # Evaluate with engine and make move
+                current_selection = None
                 best_move = think_best_move(board)
                 board.move(best_move)
-                current_board_eval = engine_white.evaluate(board)
             elif event.key == K_t:
                 # Think and print best move
                 best_move = think_best_move(board)
             elif event.key == K_u:
                 # Undo move
                 board.undo_move()
-                current_board_eval = engine_white.evaluate(board)
                 current_selection = None
-                move_count -= 1
             elif event.key == K_UP:
                 DEPTH += 1
                 print(f"Depth set to: {DEPTH}")
-                engine_white.depth = DEPTH
-                engine_black.depth = DEPTH
             elif event.key == K_DOWN:
                 DEPTH -= 1
                 print(f"Depth set to: {DEPTH}")
-                engine_white.depth = DEPTH
-                engine_black.depth = DEPTH
-            elif event.key == K_q:
-                # Evaluate the position from all engines
-                print("Evaluating current position...")
-                print(f"White Python: {engine_white.evaluate(board)}")
-                print(f"Black Python: {engine_black.evaluate(board)}")
-                print(
-                    f"White Rust: {ft.evaluate_stand_alone(board.board, board.current_player, 1)}"
-                )
-                print(
-                    f"Black Rust: {ft.evaluate_stand_alone(board.board, board.current_player, 2)}"
-                )
 
         if event.type == MOUSEBUTTONDOWN:
             # Manual Move
@@ -117,7 +95,6 @@ while True:
                     board.move(
                         f"{board.convert_coord_to_str(current_selection)}-{board.convert_coord_to_str(new_selection)}"
                     )
-                    current_board_eval = engine_white.evaluate(board)
 
                 current_selection = None
             else:
@@ -155,8 +132,5 @@ while True:
     # if board.current_player == 2:
     #     best_move = think_best_move(board)
     #     board.move(best_move)
-
-    current_board_eval = engine_white.evaluate(board)
-    # sleep(1)
 
     dt = clock.tick(FPS) / 1000
