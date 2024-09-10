@@ -175,6 +175,7 @@ struct Engine {
     player: i8,
     depth: i32,
     transposition_table: HashMap<String, (f64, Vec<String>)>,
+    table_hits: i32,
 }
 impl Engine {
     fn evaluate(&self, board: &Board) -> f64 {
@@ -258,6 +259,9 @@ impl Engine {
             }
         }
 
+        println!("Positions evaluated: {}", self.transposition_table.len());
+        println!("Table hits: {}", self.table_hits);
+
         self.transposition_table.clear();
 
         let best_move_str = format!(
@@ -294,6 +298,7 @@ impl Engine {
         let board_hash = format!("{:?}", board.board);
         if hash_table {
             if let Some(&(eval, ref move_sequence)) = self.transposition_table.get(&board_hash) {
+                self.table_hits += 1;
                 return (eval, move_sequence.clone());
             }
         }
@@ -364,6 +369,7 @@ fn get_best_move(board: Vec<Vec<i8>>, board_current_plater: i8, player: i8, dept
         player,
         depth,
         transposition_table: HashMap::new(),
+        table_hits: 0,
     };
     let mut board = Board {
         board: board.clone(),
@@ -383,6 +389,7 @@ fn evaluate_stand_alone(board: Vec<Vec<i8>>, board_current_plater: i8, player: i
         player,
         depth: 0,
         transposition_table: HashMap::new(),
+        table_hits: 0,
     };
     let mut board = Board {
         board: board.clone(),

@@ -126,11 +126,11 @@ while True:
     #     print("Game Over")
     #     player = "White" if board.current_player == 2 else "Black"
     #     print(f"Player {player} wins")
-    #     while True:
-    #         pass
+    #     board.save_moves("last_game.txt")
 
     # if board.current_player == 2:
     #     best_move = think_best_move(board)
     #     board.move(best_move)
+    #     sleep(1)
 
     dt = clock.tick(FPS) / 1000

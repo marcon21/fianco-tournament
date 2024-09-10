@@ -53,9 +53,6 @@ class Board:
     def __hash__(self) -> int:
         return hash(self.board.tobytes())
 
-    def set_board(self, board):
-        self.board = board
-
     def calculate_legal_moves(self):
         if self.is_game_over():
             self.legal_moves = {}
@@ -322,7 +319,7 @@ class Board:
                 )
 
     def print_history(self, window):
-        for i, move in enumerate(self.past_moves):
+        for i, move in enumerate(self.past_moves[-39:]):
             if i % 2 == 0:
                 p = "W"
             else:
