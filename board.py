@@ -319,7 +319,7 @@ class Board:
                 )
 
     def print_history(self, window):
-        for i, move in enumerate(self.past_moves[-39:]):
+        for i, move in enumerate(self.past_moves[-35:]):
             if i % 2 == 0:
                 p = "W"
             else:

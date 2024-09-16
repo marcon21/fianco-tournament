@@ -28,16 +28,25 @@ current_board_eval = evaluate_function(board)
 
 current_selection = None
 move_count = 0
+white_time = 0
+black_time = 0
 
 
 def think_best_move(board):
+    global white_time, black_time
     print(f"Player {player} Evaluating...")
     start_time = time()
     if board.current_player == 1:
         best_move = ft.get_best_move(board.board, board.current_player, 1, DEPTH)
+        white_time += time() - start_time
+        print(f"White time: {white_time:.2f}")
     else:
         best_move = ft.get_best_move(board.board, board.current_player, 2, DEPTH)
-    print(f"Time taken: {time()-start_time:.2f}, Move: {best_move}")
+        black_time += time() - start_time
+        print(f"Black time: {black_time:.2f}")
+    print(
+        f"Time taken: {time()-start_time:.2f}, Move: {best_move}, Total time: {white_time+black_time:.2f}"
+    )
     return best_move
 
 
@@ -110,25 +119,47 @@ while True:
     if current_selection:
         board.draw_possible_moves(window, current_selection)
 
+    # Time text
+    text = font.render(f"Total: {white_time+black_time:.2f}s", True, (0, 0, 0))
+    window.blit(text, (WIDTH - 270, HEIGHT - 190))
+
+    text = font.render(f"Black: {black_time:.2f}s", True, (0, 0, 0))
+    window.blit(text, (WIDTH - 270, HEIGHT - 160))
+
+    text = font.render(f"White: {white_time:.2f}s", True, (0, 0, 0))
+    window.blit(text, (WIDTH - 270, HEIGHT - 130))
+
+    # Depth text
+    text = font.render(f"Depth: {DEPTH}", True, (0, 0, 0))
+    window.blit(text, (WIDTH - 270, HEIGHT - 100))
+
+    # Evaluation Text
+    text = font.render(
+        f"Eval: {'+' if current_board_eval>=0 else ' '}{current_board_eval}",
+        True,
+        (0, 0, 0),
+    )
+    window.blit(text, (WIDTH - 270, HEIGHT - 70))
+
     # Current player text
     text = font.render(f"Current player: {player}", True, (0, 0, 0))
     window.blit(text, (WIDTH - 270, HEIGHT - 40))
 
-    # Evaluation Bar
-    text = font.render(
-        f"{'+' if current_board_eval>=0 else ' '}{current_board_eval}", True, (0, 0, 0)
-    )
-    window.blit(text, (9 * CELL_SIZE + 30, HEIGHT - 90))
-
     pygame.display.flip()
 
-    # if board.is_game_over():
-    #     print("Game Over")
-    #     player = "White" if board.current_player == 2 else "Black"
-    #     print(f"Player {player} wins")
-    #     board.save_moves("last_game.txt")
+    if board.is_game_over():
+        print("Game Over")
+        player = "White" if board.current_player == 2 else "Black"
+        print(f"Player {player} wins")
+        board.save_moves("last_game.txt")
+
+    # current_selection = None
+    # best_move = think_best_move(board)
+    # board.move(best_move)
+    # sleep(1)
 
     # if board.current_player == 2:
+    #     current_selection = None
     #     best_move = think_best_move(board)
     #     board.move(best_move)
     #     sleep(1)

@@ -1,5 +1,6 @@
 use pyo3::prelude::*;
 use std::collections::HashMap;
+use std::cmp::Ordering;
 
 struct Board {
     board: Vec<Vec<i8>>,
@@ -75,7 +76,7 @@ impl Board {
     }
 
     fn get_possible_moves(&self, piece: (usize, usize)) -> Vec<(i8, i8)> {
-        let player = self.board[piece.0][piece.1];
+        let player: i8 = self.board[piece.0][piece.1];
 
         if player == 0 {
             return vec![];
@@ -177,85 +178,153 @@ struct Engine {
     transposition_table: HashMap<String, (f64, Vec<String>)>,
     table_hits: i32,
 }
+
 impl Engine {
     fn evaluate(&self, board: &Board) -> f64 {
         let player_prospective =
             (if board.current_player == self.player { 1 } else { -1 }) *
             (if self.player == 1 { 1 } else { -1 });
 
-        let ones: Vec<usize> = board.board
+        let ones_count: i32 = board.board
             .iter()
-            .enumerate()
-            .filter_map(|(i, row)| if row.contains(&1) { Some(i) } else { None })
-            .collect();
-        let twos: Vec<usize> = board.board
+            .map(
+                |row|
+                    row
+                        .iter()
+                        .filter(|&&x| x == 1)
+                        .count() as i32
+            )
+            .sum();
+        let twos_count: i32 = board.board
             .iter()
-            .enumerate()
-            .filter_map(|(i, row)| if row.contains(&2) { Some(i) } else { None })
-            .collect();
+            .map(
+                |row|
+                    row
+                        .iter()
+                        .filter(|&&x| x == 2)
+                        .count() as i32
+            )
+            .sum();
 
-        let material_diff = (ones.len() as i32) - (twos.len() as i32);
-        if ones.contains(&0) {
-            return 1000.0 * (player_prospective as f64);
-        } else if twos.contains(&8) {
-            return -1000.0 * (player_prospective as f64);
+        let material_diff = ones_count - twos_count;
+
+        match board.is_game_over() {
+            1 => {
+                return 1000.0 * (player_prospective as f64);
+            }
+            2 => {
+                return -1000.0 * (player_prospective as f64);
+            }
+            _ => {}
         }
 
-        let ones: Vec<usize> = ones
+        let mut ones_rows: Vec<usize> = board.board
+            .iter()
+            .enumerate()
+            .flat_map(|(row_index, row)| {
+                row.iter()
+                    .enumerate()
+                    .filter(|&(_, &value)| value == 1)
+                    .map(move |(_col_index, _)| row_index)
+            })
+            .collect();
+
+        ones_rows = ones_rows
             .iter()
             .map(|&x| 9 - x)
             .collect();
-        let mut twos: Vec<usize> = twos
+
+        let mut twos_rows: Vec<usize> = board.board
             .iter()
+            .enumerate()
+            .flat_map(|(row_index, row)| {
+                row.iter()
+                    .enumerate()
+                    .filter(|&(_, &value)| value == 2)
+                    .map(move |(_col_index, _)| row_index)
+            })
+            .collect();
+
+        twos_rows = twos_rows
+            .iter()
+            .rev()
             .map(|&x| x + 1)
             .collect();
-        twos.reverse();
 
-        let avg_ones = weighted_average(&ones);
-        let avg_twos = weighted_average(&twos);
+        let avg_ones = weighted_average(&ones_rows);
+        let avg_twos = weighted_average(&twos_rows);
 
-        return (((material_diff * 5) as f64) + avg_ones - avg_twos) * (player_prospective as f64);
+        // println!("Ones rows: {:?}", ones_rows);
+        // println!("Twos rows: {:?}", twos_rows);
+        // println!("Avg ones: {}", avg_ones);
+        // println!("Avg twos: {}", avg_twos);
+
+        let avg_diff: f64 = (avg_ones - avg_twos) as f64;
+
+        return ((material_diff as f64) * 5.0 + avg_diff * 5.0) * (player_prospective as f64);
     }
 
     fn get_best_move(&mut self, board: &mut Board) -> String {
         let mut best_eval = f64::NEG_INFINITY;
         let mut best_move: ((i8, i8), (i8, i8)) = ((0, 0), (0, 0));
         let mut best_move_sequence = Vec::new();
+        // let alpha = f64::NEG_INFINITY;
         let mut alpha = f64::NEG_INFINITY;
         let beta = f64::INFINITY;
 
-        for (piece, moves) in board.legal_moves.clone() {
-            let piece_coords = (
-                piece.chars().nth(0).unwrap().to_digit(10).unwrap() as i8,
-                piece.chars().nth(1).unwrap().to_digit(10).unwrap() as i8,
-            );
-            for move_ in moves {
-                board.make_move(piece_coords, move_);
-                let (mut eval, move_sequence) = self.negamax(
-                    board,
-                    self.depth - 1,
-                    -beta,
-                    -alpha,
-                    true
+        let moves = self.get_ordered_moves(board); // Use ordered moves
+        if
+            board.board ==
+            vec![
+                vec![2, 2, 2, 2, 2, 2, 2, 2, 2],
+                vec![0, 2, 0, 0, 0, 0, 0, 2, 0],
+                vec![0, 0, 2, 0, 0, 0, 2, 0, 0],
+                vec![0, 0, 0, 2, 0, 2, 0, 0, 0],
+                vec![0, 0, 0, 0, 0, 0, 0, 0, 0],
+                vec![0, 0, 0, 1, 0, 1, 0, 0, 0],
+                vec![0, 0, 1, 0, 0, 0, 1, 0, 0],
+                vec![0, 1, 0, 0, 0, 0, 0, 1, 0],
+                vec![1, 1, 1, 1, 1, 1, 1, 1, 1]
+            ]
+        {
+            return "D4-D5".to_string();
+        }
+
+        // println!("Number of moves depth 1: {}", moves.len());
+
+        for (piece_coords, move_) in moves {
+            board.make_move(piece_coords, move_);
+            if board.is_game_over() == self.player {
+                return format!(
+                    "{}-{}",
+                    Board::convert_coord_to_str(piece_coords),
+                    Board::convert_coord_to_str(move_)
                 );
-                eval = -eval;
-                if eval > best_eval {
-                    best_eval = eval;
-                    best_move = (piece_coords, move_);
-                    best_move_sequence = vec![
-                        format!(
-                            "{}-{}",
-                            Board::convert_coord_to_str(piece_coords),
-                            Board::convert_coord_to_str(move_)
-                        )
-                    ];
-                    best_move_sequence.extend(move_sequence);
-                }
-                alpha = alpha.max(eval);
-                board.undo_move();
-                if alpha >= beta {
-                    break;
-                }
+            }
+            let (mut eval, move_sequence) = self.negamax(
+                board,
+                self.depth - 1,
+                -beta,
+                -alpha,
+                true
+            );
+            eval = -eval;
+            if eval > best_eval {
+                best_eval = eval;
+                best_move = (piece_coords, move_);
+                best_move_sequence = vec![
+                    format!(
+                        "{}-{}",
+                        Board::convert_coord_to_str(piece_coords),
+                        Board::convert_coord_to_str(move_)
+                    )
+                ];
+                best_move_sequence.extend(move_sequence);
+            }
+            board.undo_move();
+            alpha = alpha.max(eval);
+            if alpha >= beta {
+                break;
             }
         }
 
@@ -279,8 +348,7 @@ impl Engine {
                 "{}: {}",
                 move_,
                 self.evaluate(board) *
-                    (if self.player == board.current_player { 1.0 } else { -1.0 }) *
-                    (if self.player == 1 { 1.0 } else { -1.0 })
+                    (if self.player == board.current_player { 1.0 } else { -1.0 })
             );
         }
 
@@ -290,8 +358,8 @@ impl Engine {
     fn negamax(
         &mut self,
         board: &mut Board,
-        depth: i32,
-        alpha: f64,
+        mut depth: i32,
+        mut alpha: f64,
         beta: f64,
         hash_table: bool
     ) -> (f64, Vec<String>) {
@@ -312,55 +380,97 @@ impl Engine {
         let mut best_eval = f64::NEG_INFINITY;
         let mut best_move_sequence = Vec::new();
 
-        for (piece, moves) in board.legal_moves.clone() {
-            let piece_coords = (
-                piece.chars().nth(0).unwrap().to_digit(10).unwrap() as i8,
-                piece.chars().nth(1).unwrap().to_digit(10).unwrap() as i8,
+        let moves = self.get_ordered_moves(board); // Use ordered moves
+
+        // if moves.len() < 8 {
+        //     depth += 1;
+        // }
+
+        for (piece_coords, move_) in moves {
+            board.make_move(piece_coords, move_);
+            let new_alpha: f64 = -beta;
+            let new_beta: f64 = -alpha;
+            if (piece_coords.0 - move_.0).abs() > 1 {
+                depth += 1;
+            }
+            let (mut eval, move_sequence) = self.negamax(
+                board,
+                depth - 1,
+                new_alpha,
+                new_beta,
+                hash_table
             );
-            for move_ in moves {
-                board.make_move(piece_coords, move_);
-                let new_alpha: f64 = -beta;
-                let new_beta: f64 = -alpha;
-                let (mut eval, move_sequence) = self.negamax(
-                    board,
-                    depth - 1,
-                    new_alpha,
-                    new_beta,
-                    hash_table
-                );
-                eval = -eval;
-                if eval > best_eval {
-                    best_eval = eval;
-                    best_move_sequence = vec![
-                        format!(
-                            "{}-{}",
-                            Board::convert_coord_to_str(piece_coords),
-                            Board::convert_coord_to_str(move_)
-                        )
-                    ];
-                    best_move_sequence.extend(move_sequence);
-                }
-                let new_new_alpha = alpha.max(eval);
-                board.undo_move();
-                if new_new_alpha >= beta {
-                    break;
-                }
+            eval = -eval;
+            if eval > best_eval {
+                best_eval = eval;
+                best_move_sequence = vec![
+                    format!(
+                        "{}-{}",
+                        Board::convert_coord_to_str(piece_coords),
+                        Board::convert_coord_to_str(move_)
+                    )
+                ];
+                best_move_sequence.extend(move_sequence);
+            }
+            alpha = alpha.max(eval);
+            board.undo_move();
+            if alpha >= beta {
+                break;
             }
         }
 
         self.transposition_table.insert(board_hash, (best_eval, best_move_sequence.clone()));
         (best_eval, best_move_sequence)
     }
+
+    fn get_ordered_moves(&self, board: &Board) -> Vec<((i8, i8), (i8, i8))> {
+        let mut moves: Vec<((i8, i8), (i8, i8))> = Vec::new();
+        for (piece, piece_moves) in &board.legal_moves {
+            let piece_coords = (
+                piece.chars().nth(0).unwrap().to_digit(10).unwrap() as i8,
+                piece.chars().nth(1).unwrap().to_digit(10).unwrap() as i8,
+            );
+            for &move_ in piece_moves {
+                moves.push((piece_coords, move_));
+            }
+        }
+
+        moves.sort_by(|piece_coords: &((i8, i8), (i8, i8)), move_: &((i8, i8), (i8, i8))| {
+            if (move_.1.0 == 0 || move_.1.0 == 8) && move_.1.0 != piece_coords.1.0 {
+                Ordering::Greater
+            } else {
+                Ordering::Equal
+            }
+
+            // if move_2.0 == 0 || move_2.0 == 8 { Ordering::Greater } else { Ordering::Equal }
+        });
+
+        moves
+    }
 }
 
 fn weighted_average(values: &Vec<usize>) -> f64 {
-    let total_weight: usize = (1..=values.len()).sum();
-    let weighted_sum: usize = values
+    // Define a base for the exponential function
+    let base: f64 = 1.05;
+
+    // Calculate the weights using an exponential function
+    let weights: Vec<f64> = values
         .iter()
-        .enumerate()
-        .map(|(i, &val)| val * (values.len() - i))
+        .map(|&v| base.powf(v as f64))
+        .collect();
+
+    // Compute the weighted sum of the values
+    let weighted_sum: f64 = values
+        .iter()
+        .zip(weights.iter())
+        .map(|(&v, &w)| (v as f64) * w)
         .sum();
-    (weighted_sum as f64) / (total_weight as f64)
+
+    // Compute the sum of the weights
+    let sum_of_weights: f64 = weights.iter().sum();
+
+    // Calculate the weighted average
+    weighted_sum / sum_of_weights
 }
 
 #[pyfunction]
