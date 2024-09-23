@@ -182,8 +182,12 @@ struct Engine {
 impl Engine {
     fn evaluate(&self, board: &Board) -> f64 {
         let player_prospective =
-            (if board.current_player == self.player { 1 } else { -1 }) *
-            (if self.player == 1 { 1 } else { -1 });
+            // (if board.current_player == self.player { 1 } else { -1 }) *
+            if self.player == 1 {
+                1
+            } else {
+                -1
+            };
 
         let ones_count: i32 = board.board
             .iter()
@@ -306,7 +310,12 @@ impl Engine {
                 self.depth - 1,
                 -beta,
                 -alpha,
-                true
+                true,
+                if self.player == 2 {
+                    1
+                } else {
+                    -1
+                }
             );
             eval = -eval;
             if eval > best_eval {
@@ -361,7 +370,8 @@ impl Engine {
         mut depth: i32,
         mut alpha: f64,
         beta: f64,
-        hash_table: bool
+        hash_table: bool,
+        color: i8
     ) -> (f64, Vec<String>) {
         let board_hash = format!("{:?}", board.board);
         if hash_table {
@@ -372,7 +382,7 @@ impl Engine {
         }
 
         if depth == 0 || board.is_game_over() > 0 {
-            let eval = self.evaluate(board);
+            let eval = self.evaluate(board) * (color as f64);
             self.transposition_table.insert(board_hash, (eval, Vec::new()));
             return (eval, Vec::new());
         }
@@ -398,7 +408,8 @@ impl Engine {
                 depth - 1,
                 new_alpha,
                 new_beta,
-                hash_table
+                hash_table,
+                -color
             );
             eval = -eval;
             if eval > best_eval {
