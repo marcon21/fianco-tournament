@@ -320,7 +320,8 @@ class Board:
 
     def print_history(self, window):
         for i, move in enumerate(self.past_moves[-35:]):
-            if i % 2 == 0:
+            j = i + (len(self.past_moves) + 1 if len(self.past_moves) > 35 else 0)
+            if j % 2 == 0:
                 p = "W"
             else:
                 p = "B"
