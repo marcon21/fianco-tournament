@@ -9,4 +9,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 numpy = "0.21.0"
-pyo3 = { version = "0.21", features = ["extension-module"] }
+pyo3 = "0.21.0"

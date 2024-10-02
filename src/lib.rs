@@ -2,6 +2,18 @@ use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::cmp::Ordering;
 
+const INITIAL_BOARD: [[i8; 9]; 9] = [
+    [2, 2, 2, 2, 2, 2, 2, 2, 2],
+    [0, 2, 0, 0, 0, 0, 0, 2, 0],
+    [0, 0, 2, 0, 0, 0, 2, 0, 0],
+    [0, 0, 0, 2, 0, 2, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 1, 0, 1, 0, 0, 0],
+    [0, 0, 1, 0, 0, 0, 1, 0, 0],
+    [0, 1, 0, 0, 0, 0, 0, 1, 0],
+    [1, 1, 1, 1, 1, 1, 1, 1, 1],
+];
+
 struct Board {
     board: Vec<Vec<i8>>,
     past_legal_moves: Vec<HashMap<String, Vec<(i8, i8)>>>,
@@ -261,46 +273,45 @@ impl Engine {
 
         let avg_diff: f64 = (avg_ones - avg_twos) as f64;
 
-        return ((material_diff as f64) * 5.0 + avg_diff * 5.0) * (player_prospective as f64);
+        return ((material_diff as f64) * 5.0 + avg_diff * 10.0) * (player_prospective as f64);
     }
 
-    fn get_best_move(&mut self, board: &mut Board) -> String {
+    fn get_best_move(&mut self, board: &mut Board) -> (String, f64) {
         let mut best_eval = f64::NEG_INFINITY;
         let mut best_move: ((i8, i8), (i8, i8)) = ((0, 0), (0, 0));
         let mut best_move_sequence = Vec::new();
-        // let alpha = f64::NEG_INFINITY;
         let mut alpha = f64::NEG_INFINITY;
         let beta = f64::INFINITY;
 
         let moves = self.get_ordered_moves(board); // Use ordered moves
-        if
-            board.board ==
-            vec![
-                vec![2, 2, 2, 2, 2, 2, 2, 2, 2],
-                vec![0, 2, 0, 0, 0, 0, 0, 2, 0],
-                vec![0, 0, 2, 0, 0, 0, 2, 0, 0],
-                vec![0, 0, 0, 2, 0, 2, 0, 0, 0],
-                vec![0, 0, 0, 0, 0, 0, 0, 0, 0],
-                vec![0, 0, 0, 1, 0, 1, 0, 0, 0],
-                vec![0, 0, 1, 0, 0, 0, 1, 0, 0],
-                vec![0, 1, 0, 0, 0, 0, 0, 1, 0],
-                vec![1, 1, 1, 1, 1, 1, 1, 1, 1]
-            ]
-        {
-            return "D4-D5".to_string();
+        if board.board == INITIAL_BOARD {
+            return ("D4-D5".to_string(), 0.0);
         }
 
-        // println!("Number of moves depth 1: {}", moves.len());
+        if board.legal_moves.len() == 1 {
+            return (
+                format!(
+                    "{}-{}",
+                    Board::convert_coord_to_str(moves[0].0),
+                    Board::convert_coord_to_str(moves[0].1)
+                ),
+                self.evaluate(board) *
+                    (if self.player == board.current_player { 1.0 } else { -1.0 }),
+            );
+        }
 
         for (piece_coords, move_) in moves {
             board.make_move(piece_coords, move_);
-            if board.is_game_over() == self.player {
-                return format!(
-                    "{}-{}",
-                    Board::convert_coord_to_str(piece_coords),
-                    Board::convert_coord_to_str(move_)
-                );
-            }
+            // if board.is_game_over() == self.player {
+            //     return (
+            //         format!(
+            //             "{}-{}",
+            //             Board::convert_coord_to_str(piece_coords),
+            //             Board::convert_coord_to_str(move_)
+            //         ),
+            //         1000.0 * (if self.player == board.current_player { 1.0 } else { -1.0 }),
+            //     );
+            // }
             let (mut eval, move_sequence) = self.negamax(
                 board,
                 self.depth - 1,
@@ -309,6 +320,7 @@ impl Engine {
                 true
             );
             eval = -eval;
+
             if eval > best_eval {
                 best_eval = eval;
                 best_move = (piece_coords, move_);
@@ -322,6 +334,7 @@ impl Engine {
                 best_move_sequence.extend(move_sequence);
             }
             board.undo_move();
+
             alpha = alpha.max(eval);
             if alpha >= beta {
                 break;
@@ -339,30 +352,30 @@ impl Engine {
             Board::convert_coord_to_str(best_move.1)
         );
 
+        let mut expected_eval: f64 = 0.0;
         for move_ in best_move_sequence.clone() {
             let coords: Vec<&str> = move_.split('-').collect();
             let start = Board::convert_str_to_coord(coords[0]);
-            let end = Board::convert_str_to_coord(coords[1]);
+            let end: (i8, i8) = Board::convert_str_to_coord(coords[1]);
             board.make_move(start, end);
-            println!(
-                "{}: {}",
-                move_,
+            expected_eval =
                 self.evaluate(board) *
-                    (if self.player == board.current_player { 1.0 } else { -1.0 })
-            );
+                (if self.player == board.current_player { 1.0 } else { -1.0 });
+            println!("{}: {}", move_, expected_eval);
         }
 
-        return best_move_str;
+        return (best_move_str, expected_eval);
     }
 
     fn negamax(
         &mut self,
         board: &mut Board,
-        mut depth: i32,
+        depth: i32,
         mut alpha: f64,
         beta: f64,
         hash_table: bool
     ) -> (f64, Vec<String>) {
+        // Check in hash table
         let board_hash = format!("{:?}", board.board);
         if hash_table {
             if let Some(&(eval, ref move_sequence)) = self.transposition_table.get(&board_hash) {
@@ -371,6 +384,7 @@ impl Engine {
             }
         }
 
+        // Check if game is over or reached max depth
         if depth == 0 || board.is_game_over() > 0 {
             let eval = self.evaluate(board);
             self.transposition_table.insert(board_hash, (eval, Vec::new()));
@@ -382,22 +396,16 @@ impl Engine {
 
         let moves = self.get_ordered_moves(board); // Use ordered moves
 
-        // if moves.len() < 8 {
-        //     depth += 1;
-        // }
-
         for (piece_coords, move_) in moves {
             board.make_move(piece_coords, move_);
-            let new_alpha: f64 = -beta;
-            let new_beta: f64 = -alpha;
-            if (piece_coords.0 - move_.0).abs() > 1 {
-                depth += 1;
-            }
+            // if (piece_coords.0 - move_.0).abs() > 1 {
+            //     depth += 1;
+            // }
             let (mut eval, move_sequence) = self.negamax(
                 board,
                 depth - 1,
-                new_alpha,
-                new_beta,
+                -beta,
+                -alpha,
                 hash_table
             );
             eval = -eval;
@@ -431,19 +439,21 @@ impl Engine {
                 piece.chars().nth(1).unwrap().to_digit(10).unwrap() as i8,
             );
             for &move_ in piece_moves {
-                moves.push((piece_coords, move_));
+                moves.push((piece_coords, move_).clone());
             }
         }
 
-        moves.sort_by(|piece_coords: &((i8, i8), (i8, i8)), move_: &((i8, i8), (i8, i8))| {
-            if (move_.1.0 == 0 || move_.1.0 == 8) && move_.1.0 != piece_coords.1.0 {
-                Ordering::Greater
+        moves.sort_by(|a: &((i8, i8), (i8, i8)), b: &((i8, i8), (i8, i8))| {
+            if a.0 > b.0 {
+                return Ordering::Less;
             } else {
-                Ordering::Equal
+                return Ordering::Greater;
             }
-
-            // if move_2.0 == 0 || move_2.0 == 8 { Ordering::Greater } else { Ordering::Equal }
         });
+
+        if board.current_player == 1 {
+            moves.reverse();
+        }
 
         moves
     }
@@ -474,7 +484,12 @@ fn weighted_average(values: &Vec<usize>) -> f64 {
 }
 
 #[pyfunction]
-fn get_best_move(board: Vec<Vec<i8>>, board_current_plater: i8, player: i8, depth: i32) -> String {
+fn get_best_move(
+    board: Vec<Vec<i8>>,
+    board_current_plater: i8,
+    player: i8,
+    depth: i32
+) -> (String, f64) {
     let mut engine = Engine {
         player,
         depth,
@@ -490,7 +505,13 @@ fn get_best_move(board: Vec<Vec<i8>>, board_current_plater: i8, player: i8, dept
     };
     board.calculate_legal_moves();
 
-    engine.get_best_move(&mut board)
+    let (best_move, expected_eval) = engine.get_best_move(&mut board);
+    if best_move == "A9-A9" {
+        board.calculate_legal_moves();
+        println!("{:?}", board.legal_moves);
+    }
+
+    return (best_move, expected_eval);
 }
 
 #[pyfunction]

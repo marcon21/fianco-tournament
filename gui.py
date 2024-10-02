@@ -32,83 +32,93 @@ white_time = 0
 black_time = 0
 
 
-def think_best_move(board):
+def think_best_move(board, time_it=True):
     global white_time, black_time
     print(f"Player {player} Evaluating...")
     start_time = time()
     if board.current_player == 1:
-        best_move = ft.get_best_move(board.board, board.current_player, 1, DEPTH)
-        white_time += time() - start_time
+        best_move, expected_res = ft.get_best_move(
+            board.board, board.current_player, 1, DEPTH
+        )
+        if time_it:
+            white_time += time() - start_time
         print(f"White time: {white_time:.2f}")
     else:
-        best_move = ft.get_best_move(board.board, board.current_player, 2, DEPTH)
-        black_time += time() - start_time
+        best_move, expected_res = ft.get_best_move(
+            board.board, board.current_player, 2, DEPTH
+        )
+        if time_it:
+            black_time += time() - start_time
         print(f"Black time: {black_time:.2f}")
+
     print(
-        f"Time taken: {time()-start_time:.2f}, Move: {best_move}, Total time: {white_time+black_time:.2f}"
+        f"Time taken: {time()-start_time:.2f}, Move: {best_move}, Expected Eval: {expected_res}, Total time: {white_time+black_time:.2f}"
     )
+
     return best_move
 
 
 while True:
     player = "White" if board.current_player == 1 else "Black"
     current_board_eval = evaluate_function(board)
+    try:
+        for event in pygame.event.get():
+            if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
+                pygame.quit()
+                exit()
+            if event.type == KEYDOWN:
+                if event.key == K_r:
+                    # Reset board
+                    board = Board()
+                    current_selection = None
+                elif event.key == K_e:
+                    # Evaluate with engine and make move
+                    current_selection = None
+                    best_move = think_best_move(board)
+                    board.move(best_move)
+                elif event.key == K_t:
+                    # Think and print best move
+                    best_move = think_best_move(board)
+                elif event.key == K_u:
+                    # Undo move
+                    board.undo_move()
+                    current_selection = None
+                elif event.key == K_UP:
+                    DEPTH += 1
+                    print(f"Depth set to: {DEPTH}")
+                elif event.key == K_DOWN:
+                    DEPTH -= 1
+                    print(f"Depth set to: {DEPTH}")
 
-    for event in pygame.event.get():
-        if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
-            pygame.quit()
-            exit()
-        if event.type == KEYDOWN:
-            if event.key == K_r:
-                # Reset board
-                board = Board()
-                current_selection = None
-            elif event.key == K_e:
-                # Evaluate with engine and make move
-                current_selection = None
-                best_move = think_best_move(board)
-                board.move(best_move)
-            elif event.key == K_t:
-                # Think and print best move
-                best_move = think_best_move(board)
-            elif event.key == K_u:
-                # Undo move
-                board.undo_move()
-                current_selection = None
-            elif event.key == K_UP:
-                DEPTH += 1
-                print(f"Depth set to: {DEPTH}")
-            elif event.key == K_DOWN:
-                DEPTH -= 1
-                print(f"Depth set to: {DEPTH}")
+            if event.type == MOUSEBUTTONDOWN:
+                # Manual Move
+                pos = pygame.mouse.get_pos()
+                x, y = pos
+                x = x // CELL_SIZE
+                y = y // CELL_SIZE
 
-        if event.type == MOUSEBUTTONDOWN:
-            # Manual Move
-            pos = pygame.mouse.get_pos()
-            x, y = pos
-            x = x // CELL_SIZE
-            y = y // CELL_SIZE
+                if y > 8 or y < 0 or x > 8 or x < 0:
+                    continue
 
-            if y > 8 or y < 0 or x > 8 or x < 0:
-                continue
+                new_selection = [y, x]
 
-            new_selection = [y, x]
+                if current_selection is not None:
+                    if (
+                        new_selection
+                        in board.legal_moves[
+                            f"{current_selection[0]}{current_selection[1]}"
+                        ]
+                    ):
+                        board.move(
+                            f"{board.convert_coord_to_str(current_selection)}-{board.convert_coord_to_str(new_selection)}"
+                        )
 
-            if current_selection is not None:
-                if (
-                    new_selection
-                    in board.legal_moves[
-                        f"{current_selection[0]}{current_selection[1]}"
-                    ]
-                ):
-                    board.move(
-                        f"{board.convert_coord_to_str(current_selection)}-{board.convert_coord_to_str(new_selection)}"
-                    )
-
-                current_selection = None
-            else:
-                if board.board[y, x] == board.current_player:
-                    current_selection = [y, x]
+                    current_selection = None
+                else:
+                    if board.board[y, x] == board.current_player:
+                        current_selection = [y, x]
+    except Exception as e:
+        print(e)
 
     window.fill(SCREEN_COLOR)
 

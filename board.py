@@ -242,6 +242,43 @@ class Board:
                 (CELL_SIZE * 9 - CELL_SIZE / 2, i * CELL_SIZE + CELL_SIZE / 2),
             )
 
+        # Draw last move
+        if self.past_moves:
+            move = self.past_moves[-1]
+            start = self.convert_coord_to_abs(move[:2])
+            end = self.convert_coord_to_abs(move[3:])
+            pygame.draw.line(
+                window,
+                (0, 255, 0),
+                (
+                    start[1] * CELL_SIZE + CELL_SIZE / 2,
+                    start[0] * CELL_SIZE + CELL_SIZE / 2,
+                ),
+                (
+                    end[1] * CELL_SIZE + CELL_SIZE / 2,
+                    end[0] * CELL_SIZE + CELL_SIZE / 2,
+                ),
+                5,
+            )
+            pygame.draw.circle(
+                window,
+                (0, 255, 0),
+                (
+                    start[1] * CELL_SIZE + CELL_SIZE / 2,
+                    start[0] * CELL_SIZE + CELL_SIZE / 2,
+                ),
+                RADIUS / 3 * 2,
+            )
+            pygame.draw.circle(
+                window,
+                (0, 255, 0),
+                (
+                    end[1] * CELL_SIZE + CELL_SIZE / 2,
+                    end[0] * CELL_SIZE + CELL_SIZE / 2,
+                ),
+                RADIUS + 4,
+            )
+
         for capturer in self.capturers:
             # Draw capturer
             pygame.draw.circle(
