@@ -188,7 +188,7 @@ impl Board {
 struct Engine {
     player: i8,
     depth: i32,
-    transposition_table: HashMap<String, (f64, Vec<String>)>,
+    transposition_table: HashMap<String, (i32, f64, Vec<String>)>, // Updated to store depth
     table_hits: i32,
 }
 
@@ -302,7 +302,7 @@ impl Engine {
             );
         }
 
-        let mut depth = 1;
+        let mut depth = 5;
         let mut using_time_limit: bool = true;
 
         if time_limit.as_secs() == 0 {
@@ -312,9 +312,18 @@ impl Engine {
 
         while start_time.elapsed() < time_limit || !using_time_limit {
             for (piece_coords, move_) in &moves {
+                if start_time.elapsed() >= time_limit && using_time_limit {
+                    break;
+                }
                 board.make_move(*piece_coords, *move_);
 
-                let (mut eval, move_sequence) = self.negamax(board, depth - 1, -beta, -alpha, true);
+                let (mut eval, move_sequence) = self.negamax(
+                    board,
+                    depth.clone() - 1,
+                    -beta,
+                    -alpha,
+                    true
+                );
                 eval = -eval;
 
                 if eval > best_eval {
@@ -335,10 +344,6 @@ impl Engine {
                 if alpha >= beta {
                     break;
                 }
-            }
-
-            if start_time.elapsed() >= time_limit && using_time_limit {
-                break;
             }
 
             if using_time_limit {
@@ -371,6 +376,10 @@ impl Engine {
             println!("{}: {}", move_, expected_eval);
         }
 
+        if using_time_limit {
+            println!("Max Depth reached: {}", depth);
+        }
+
         (best_move_str, expected_eval)
     }
 
@@ -385,16 +394,22 @@ impl Engine {
         // Check in hash table
         let board_hash = format!("{:?}", board.board);
         if hash_table {
-            if let Some(&(eval, ref move_sequence)) = self.transposition_table.get(&board_hash) {
-                self.table_hits += 1;
-                return (eval, move_sequence.clone());
+            if
+                let Some(&(stored_depth, eval, ref move_sequence)) = self.transposition_table.get(
+                    &board_hash
+                )
+            {
+                if stored_depth >= depth {
+                    self.table_hits += 1;
+                    return (eval, move_sequence.clone());
+                }
             }
         }
 
         // Check if game is over or reached max depth
         if depth == 0 || board.is_game_over() > 0 {
             let eval = self.evaluate(board);
-            self.transposition_table.insert(board_hash, (eval, Vec::new()));
+            self.transposition_table.insert(board_hash, (depth, eval, Vec::new()));
             return (eval, Vec::new());
         }
 
@@ -435,7 +450,7 @@ impl Engine {
             }
         }
 
-        self.transposition_table.insert(board_hash, (best_eval, best_move_sequence.clone()));
+        self.transposition_table.insert(board_hash, (depth, best_eval, best_move_sequence.clone()));
         (best_eval, best_move_sequence)
     }
 

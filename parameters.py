@@ -6,4 +6,4 @@ FPS = 60
 GAME_TITLE, SCREEN_COLOR = "Fianco", "white"
 
 DEPTH = 6
-MAX_TIME = 0
+MAX_TIME = 3
