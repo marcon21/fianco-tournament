@@ -1,3 +1,32 @@
 # fianco-tournament
+
 Fianco game simulator with an ai player
 Rules from: http://www.di.fc.ul.pt/~jpn/gv/fianco.htm
+
+Features:
+
+- [x] Game simulator
+- [x] Negamax with Alpha Beta Pruning
+- [x] Iterative deeping with time limit
+- [x] Trasposition table (improvable)
+- [x] Dynamic Deeping when capturing
+
+## Requirements
+
+It is suggested to use a python virtual environment to run the project and install the dependencies in the requirements.txt file.
+
+To build the project from scratch, you will need to install the rust toolchain and the maturin package. For more information on getting started with PyO3, visit the [PyO3 Getting Started Guide](https://pyo3.rs/v0.22.3/getting-started).
+
+## How to run
+
+To build the project, run the following command:
+
+```bash
+maturin dev --release
+```
+
+To run the project, run the following command:
+
+```bash
+python gui.py
+```
