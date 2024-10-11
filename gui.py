@@ -38,14 +38,14 @@ def think_best_move(board, time_it=True):
     start_time = time()
     if board.current_player == 1:
         best_move, expected_res = ft.get_best_move(
-            board.board, board.current_player, 1, DEPTH
+            board.board, board.current_player, 1, DEPTH, MAX_TIME
         )
         if time_it:
             white_time += time() - start_time
         print(f"White time: {white_time:.2f}")
     else:
         best_move, expected_res = ft.get_best_move(
-            board.board, board.current_player, 2, DEPTH
+            board.board, board.current_player, 2, DEPTH, MAX_TIME
         )
         if time_it:
             black_time += time() - start_time

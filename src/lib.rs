@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::cmp::Ordering;
+use std::time::{ Duration, Instant };
 
 const INITIAL_BOARD: [[i8; 9]; 9] = [
     [2, 2, 2, 2, 2, 2, 2, 2, 2],
@@ -276,7 +277,8 @@ impl Engine {
         return ((material_diff as f64) * 5.0 + avg_diff * 10.0) * (player_prospective as f64);
     }
 
-    fn get_best_move(&mut self, board: &mut Board) -> (String, f64) {
+    fn get_best_move(&mut self, board: &mut Board, time_limit: Duration) -> (String, f64) {
+        let start_time = Instant::now();
         let mut best_eval = f64::NEG_INFINITY;
         let mut best_move: ((i8, i8), (i8, i8)) = ((0, 0), (0, 0));
         let mut best_move_sequence = Vec::new();
@@ -300,34 +302,48 @@ impl Engine {
             );
         }
 
-        for (piece_coords, move_) in moves {
-            board.make_move(piece_coords, move_);
+        let mut depth = 1;
+        let mut using_time_limit: bool = true;
 
-            let (mut eval, move_sequence) = self.negamax(
-                board,
-                self.depth - 1,
-                -beta,
-                -alpha,
-                true
-            );
-            eval = -eval;
+        if time_limit.as_secs() == 0 {
+            depth = self.depth;
+            using_time_limit = false;
+        }
 
-            if eval > best_eval {
-                best_eval = eval;
-                best_move = (piece_coords, move_);
-                best_move_sequence = vec![
-                    format!(
-                        "{}-{}",
-                        Board::convert_coord_to_str(piece_coords),
-                        Board::convert_coord_to_str(move_)
-                    )
-                ];
-                best_move_sequence.extend(move_sequence);
+        while start_time.elapsed() < time_limit || !using_time_limit {
+            for (piece_coords, move_) in &moves {
+                board.make_move(*piece_coords, *move_);
+
+                let (mut eval, move_sequence) = self.negamax(board, depth - 1, -beta, -alpha, true);
+                eval = -eval;
+
+                if eval > best_eval {
+                    best_eval = eval;
+                    best_move = (*piece_coords, *move_);
+                    best_move_sequence = vec![
+                        format!(
+                            "{}-{}",
+                            Board::convert_coord_to_str(*piece_coords),
+                            Board::convert_coord_to_str(*move_)
+                        )
+                    ];
+                    best_move_sequence.extend(move_sequence);
+                }
+                board.undo_move();
+
+                alpha = alpha.max(eval);
+                if alpha >= beta {
+                    break;
+                }
             }
-            board.undo_move();
 
-            alpha = alpha.max(eval);
-            if alpha >= beta {
+            if start_time.elapsed() >= time_limit && using_time_limit {
+                break;
+            }
+
+            if using_time_limit {
+                depth += 1;
+            } else {
                 break;
             }
         }
@@ -355,7 +371,7 @@ impl Engine {
             println!("{}: {}", move_, expected_eval);
         }
 
-        return (best_move_str, expected_eval);
+        (best_move_str, expected_eval)
     }
 
     fn negamax(
@@ -480,7 +496,8 @@ fn get_best_move(
     board: Vec<Vec<i8>>,
     board_current_plater: i8,
     player: i8,
-    depth: i32
+    depth: i32,
+    max_time: i32
 ) -> (String, f64) {
     let mut engine = Engine {
         player,
@@ -497,7 +514,10 @@ fn get_best_move(
     };
     board.calculate_legal_moves();
 
-    let (best_move, expected_eval) = engine.get_best_move(&mut board);
+    let (best_move, expected_eval) = engine.get_best_move(
+        &mut board,
+        Duration::from_secs(max_time as u64)
+    );
     if best_move == "A9-A9" {
         board.calculate_legal_moves();
         println!("{:?}", board.legal_moves);
