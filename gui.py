@@ -68,9 +68,10 @@ while True:
                 exit()
             if event.type == KEYDOWN:
                 if event.key == K_r:
-                    # Reset board
-                    board = Board()
-                    current_selection = None
+                    pass
+                #     # Reset board
+                #     board = Board()
+                #     current_selection = None
                 elif event.key == K_e:
                     # Evaluate with engine and make move
                     current_selection = None

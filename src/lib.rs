@@ -302,16 +302,7 @@ impl Engine {
 
         for (piece_coords, move_) in moves {
             board.make_move(piece_coords, move_);
-            // if board.is_game_over() == self.player {
-            //     return (
-            //         format!(
-            //             "{}-{}",
-            //             Board::convert_coord_to_str(piece_coords),
-            //             Board::convert_coord_to_str(move_)
-            //         ),
-            //         1000.0 * (if self.player == board.current_player { 1.0 } else { -1.0 }),
-            //     );
-            // }
+
             let (mut eval, move_sequence) = self.negamax(
                 board,
                 self.depth - 1,
@@ -397,13 +388,14 @@ impl Engine {
         let moves = self.get_ordered_moves(board); // Use ordered moves
 
         for (piece_coords, move_) in moves {
+            let mut new_depth = depth.clone();
             board.make_move(piece_coords, move_);
-            // if (piece_coords.0 - move_.0).abs() > 1 {
-            //     depth += 1;
-            // }
+            if (piece_coords.0 - move_.0).abs() > 1 {
+                new_depth += 1;
+            }
             let (mut eval, move_sequence) = self.negamax(
                 board,
-                depth - 1,
+                new_depth - 1,
                 -beta,
                 -alpha,
                 hash_table
@@ -461,7 +453,7 @@ impl Engine {
 
 fn weighted_average(values: &Vec<usize>) -> f64 {
     // Define a base for the exponential function
-    let base: f64 = 1.05;
+    let base: f64 = 1.04;
 
     // Calculate the weights using an exponential function
     let weights: Vec<f64> = values
