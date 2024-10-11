@@ -55,6 +55,8 @@ def think_best_move(board, time_it=True):
         f"Time taken: {time()-start_time:.2f}, Move: {best_move}, Expected Eval: {expected_res}, Total time: {white_time+black_time:.2f}"
     )
 
+    print()
+
     return best_move
 
 
