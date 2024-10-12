@@ -10,6 +10,7 @@ Features:
 - [x] Iterative deeping with time limit
 - [x] Trasposition table (improvable)
 - [x] Dynamic Deeping when capturing
+- [ ] Multi-threading
 
 ## Requirements
 
