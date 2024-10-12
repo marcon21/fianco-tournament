@@ -2,6 +2,7 @@ use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::cmp::Ordering;
 use std::time::{ Duration, Instant };
+use rayon::prelude::*;
 
 const INITIAL_BOARD: [[i8; 9]; 9] = [
     [2, 2, 2, 2, 2, 2, 2, 2, 2],
@@ -324,8 +325,8 @@ impl Engine {
                     -alpha,
                     true
                 );
-                eval = -eval;
 
+                eval = -eval;
                 if eval > best_eval {
                     best_eval = eval;
                     best_move = (*piece_coords, *move_);
@@ -431,6 +432,7 @@ impl Engine {
                 -alpha,
                 hash_table
             );
+
             eval = -eval;
             if eval > best_eval {
                 best_eval = eval;
@@ -443,8 +445,9 @@ impl Engine {
                 ];
                 best_move_sequence.extend(move_sequence);
             }
-            alpha = alpha.max(eval);
             board.undo_move();
+
+            alpha = alpha.max(eval);
             if alpha >= beta {
                 break;
             }
