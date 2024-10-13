@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::cmp::Ordering;
 use std::time::{ Duration, Instant };
-use rayon::prelude::*;
+// use rayon::prelude::*;
 
 const INITIAL_BOARD: [[i8; 9]; 9] = [
     [2, 2, 2, 2, 2, 2, 2, 2, 2],
@@ -22,6 +22,12 @@ struct Board {
     past_moves: Vec<((i8, i8), (i8, i8))>,
     current_player: i8,
     legal_moves: HashMap<String, Vec<(i8, i8)>>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+struct Bitboards {
+    bitboard_1: u128, // Bitboard for value 1
+    bitboard_2: u128, // Bitboard for value 2
 }
 
 impl Board {
@@ -184,12 +190,38 @@ impl Board {
         self.current_player = if self.current_player == 1 { 2 } else { 1 };
         self.legal_moves = self.past_legal_moves.pop().unwrap();
     }
+
+    fn get_bitboard(&mut self) -> Bitboards {
+        let mut bitboard_1: u128 = 0;
+        let mut bitboard_2: u128 = 0;
+
+        for row in 0..9 {
+            for col in 0..9 {
+                let bit_index = row * 9 + col; // Calculate the bit index
+
+                match self.board[row][col] {
+                    1 => {
+                        bitboard_1 |= 1 << bit_index;
+                    } // Set bit for value 1
+                    2 => {
+                        bitboard_2 |= 1 << bit_index;
+                    } // Set bit for value 2
+                    _ => (), // Do nothing for value 0
+                }
+            }
+        }
+
+        Bitboards {
+            bitboard_1,
+            bitboard_2,
+        }
+    }
 }
 
 struct Engine {
     player: i8,
     depth: i32,
-    transposition_table: HashMap<String, (i32, f64, Vec<String>)>, // Updated to store depth
+    transposition_table: HashMap<Bitboards, (i32, f64, Vec<String>)>, // Updated to store depth
     table_hits: i32,
 }
 
@@ -393,11 +425,11 @@ impl Engine {
         hash_table: bool
     ) -> (f64, Vec<String>) {
         // Check in hash table
-        let board_hash = format!("{:?}", board.board);
+        let board_lookup = board.get_bitboard();
         if hash_table {
             if
                 let Some(&(stored_depth, eval, ref move_sequence)) = self.transposition_table.get(
-                    &board_hash
+                    &board_lookup
                 )
             {
                 if stored_depth >= depth {
@@ -410,7 +442,7 @@ impl Engine {
         // Check if game is over or reached max depth
         if depth == 0 || board.is_game_over() > 0 {
             let eval = self.evaluate(board);
-            self.transposition_table.insert(board_hash, (depth, eval, Vec::new()));
+            self.transposition_table.insert(board_lookup, (depth, eval, Vec::new()));
             return (eval, Vec::new());
         }
 
@@ -453,7 +485,11 @@ impl Engine {
             }
         }
 
-        self.transposition_table.insert(board_hash, (depth, best_eval, best_move_sequence.clone()));
+        self.transposition_table.insert(board_lookup, (
+            depth,
+            best_eval,
+            best_move_sequence.clone(),
+        ));
         (best_eval, best_move_sequence)
     }
 
