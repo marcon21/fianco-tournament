@@ -36,16 +36,21 @@ def think_best_move(board, time_it=True):
     global white_time, black_time
     print(f"Player {player} Evaluating...")
     start_time = time()
+
     if board.current_player == 1:
+        time_left = 600 - white_time
+        time_left = max(int(time_left), 1)
         best_move, expected_res = ft.get_best_move(
-            board.board, board.current_player, 1, DEPTH, MAX_TIME
+            board.board, board.current_player, 1, DEPTH, min(MAX_TIME, time_left * 0.15)
         )
         if time_it:
             white_time += time() - start_time
         print(f"White time: {white_time:.2f}")
     else:
+        time_left = 600 - black_time
+        time_left = max(int(time_left), 1)
         best_move, expected_res = ft.get_best_move(
-            board.board, board.current_player, 2, DEPTH, MAX_TIME
+            board.board, board.current_player, 2, DEPTH, min(MAX_TIME, time_left * 0.15)
         )
         if time_it:
             black_time += time() - start_time
