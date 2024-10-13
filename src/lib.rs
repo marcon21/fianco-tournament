@@ -2,9 +2,6 @@ use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::cmp::Ordering;
 use std::time::{ Duration, Instant };
-use once_cell::sync::Lazy;
-use std::sync::Mutex;
-use std::sync::MutexGuard;
 // use std::thread::current;
 // use rayon::prelude::*;
 
@@ -402,7 +399,7 @@ impl Engine {
             }
 
             if self.using_time_limit {
-                depth += 2;
+                depth += 1;
             } else {
                 break;
             }
