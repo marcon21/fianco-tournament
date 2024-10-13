@@ -223,6 +223,9 @@ struct Engine {
     depth: i32,
     transposition_table: HashMap<Bitboards, (i32, f64, Vec<String>)>, // Updated to store depth
     table_hits: i32,
+    time_limit: Duration,
+    using_time_limit: bool,
+    start_time: Instant,
 }
 
 impl Engine {
@@ -310,13 +313,15 @@ impl Engine {
         return ((material_diff as f64) * 5.0 + avg_diff * 10.0) * (player_prospective as f64);
     }
 
-    fn get_best_move(&mut self, board: &mut Board, time_limit: Duration) -> (String, f64) {
-        let start_time = Instant::now();
+    fn get_best_move(&mut self, board: &mut Board) -> (String, f64) {
+        self.start_time = Instant::now();
         let mut best_eval = f64::NEG_INFINITY;
         let mut best_move: ((i8, i8), (i8, i8)) = ((0, 0), (0, 0));
         let mut best_move_sequence = Vec::new();
         let mut alpha = f64::NEG_INFINITY;
         let beta = f64::INFINITY;
+
+        self.using_time_limit = self.time_limit > Duration::from_secs(0);
 
         let moves = self.get_ordered_moves(board); // Use ordered moves
         if board.board == INITIAL_BOARD {
@@ -335,17 +340,11 @@ impl Engine {
             );
         }
 
-        let mut depth = 5;
-        let mut using_time_limit: bool = true;
+        let mut depth = self.depth;
 
-        if time_limit.as_secs() == 0 {
-            depth = self.depth;
-            using_time_limit = false;
-        }
-
-        while start_time.elapsed() < time_limit || !using_time_limit {
+        while self.start_time.elapsed() < self.time_limit || !self.using_time_limit {
             for (piece_coords, move_) in &moves {
-                if start_time.elapsed() >= time_limit && using_time_limit {
+                if self.start_time.elapsed() >= self.time_limit && self.using_time_limit {
                     break;
                 }
                 board.make_move(*piece_coords, *move_);
@@ -379,7 +378,7 @@ impl Engine {
                 }
             }
 
-            if using_time_limit {
+            if self.using_time_limit {
                 depth += 1;
             } else {
                 break;
@@ -409,7 +408,7 @@ impl Engine {
             println!("{}: {}", move_, expected_eval);
         }
 
-        if using_time_limit {
+        if self.using_time_limit {
             println!("Max Depth reached: {}", depth);
         }
 
@@ -481,6 +480,10 @@ impl Engine {
 
             alpha = alpha.max(eval);
             if alpha >= beta {
+                break;
+            }
+
+            if self.using_time_limit && self.start_time.elapsed() > self.time_limit {
                 break;
             }
         }
@@ -558,6 +561,9 @@ fn get_best_move(
         depth,
         transposition_table: HashMap::new(),
         table_hits: 0,
+        time_limit: Duration::from_secs(max_time as u64),
+        using_time_limit: false,
+        start_time: Instant::now(),
     };
     let mut board = Board {
         board: board.clone(),
@@ -568,10 +574,7 @@ fn get_best_move(
     };
     board.calculate_legal_moves();
 
-    let (best_move, expected_eval) = engine.get_best_move(
-        &mut board,
-        Duration::from_secs(max_time as u64)
-    );
+    let (best_move, expected_eval) = engine.get_best_move(&mut board);
     if best_move == "A9-A9" {
         board.calculate_legal_moves();
         println!("{:?}", board.legal_moves);
@@ -587,6 +590,9 @@ fn evaluate_stand_alone(board: Vec<Vec<i8>>, board_current_plater: i8, player: i
         depth: 0,
         transposition_table: HashMap::new(),
         table_hits: 0,
+        time_limit: Duration::from_secs(0),
+        using_time_limit: false,
+        start_time: Instant::now(),
     };
     let mut board = Board {
         board: board.clone(),
