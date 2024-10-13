@@ -2,6 +2,9 @@ use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::cmp::Ordering;
 use std::time::{ Duration, Instant };
+use once_cell::sync::Lazy;
+use std::sync::Mutex;
+use std::sync::MutexGuard;
 // use std::thread::current;
 // use rayon::prelude::*;
 
@@ -227,8 +230,32 @@ struct Engine {
     time_limit: Duration,
     using_time_limit: bool,
     start_time: Instant,
-    killer_moves: Vec<Vec<((i8, i8), (i8, i8))>>,
     max_depth_reached: i32,
+    killer_moves: MutexGuard<'static, Vec<Vec<((i8, i8), (i8, i8))>>>,
+}
+
+static KILLER_MOVES_1: Lazy<Mutex<Vec<Vec<((i8, i8), (i8, i8))>>>> = Lazy::new(|| {
+    let mut killer_moves: Vec<Vec<((i8, i8), (i8, i8))>> = Vec::new();
+    for _ in 0..100 {
+        killer_moves.push(vec![]);
+    }
+    Mutex::new(killer_moves)
+});
+
+static KILLER_MOVES_2: Lazy<Mutex<Vec<Vec<((i8, i8), (i8, i8))>>>> = Lazy::new(|| {
+    let mut killer_moves: Vec<Vec<((i8, i8), (i8, i8))>> = Vec::new();
+    for _ in 0..100 {
+        killer_moves.push(vec![]);
+    }
+    Mutex::new(killer_moves)
+});
+
+fn access_killer_moves_1() -> MutexGuard<'static, Vec<Vec<((i8, i8), (i8, i8))>>> {
+    KILLER_MOVES_1.lock().unwrap() // This will block until the lock is acquired
+}
+
+fn access_killer_moves_2() -> MutexGuard<'static, Vec<Vec<((i8, i8), (i8, i8))>>> {
+    KILLER_MOVES_2.lock().unwrap()
 }
 
 impl Engine {
@@ -241,8 +268,12 @@ impl Engine {
             time_limit: Duration::from_secs(time_limit as u64),
             using_time_limit: false,
             start_time: Instant::now(),
-            killer_moves: vec![vec![]; 30 as usize],
             max_depth_reached: 0,
+            killer_moves: if player == 1 {
+                access_killer_moves_1()
+            } else {
+                access_killer_moves_2()
+            },
         }
     }
 
@@ -338,6 +369,8 @@ impl Engine {
         let mut alpha = f64::NEG_INFINITY;
         let beta = f64::INFINITY;
 
+        println!("Non 0 element in killer moves: {}", self.killer_moves.iter().flatten().count());
+
         self.using_time_limit = self.time_limit > Duration::from_secs(0);
 
         let moves = self.get_ordered_moves(board, 0); // Use ordered moves
@@ -407,6 +440,8 @@ impl Engine {
         println!("Table hits: {}", self.table_hits);
 
         self.transposition_table.clear();
+        self.killer_moves.push(vec![]);
+        self.killer_moves.remove(0);
 
         let best_move_str = format!(
             "{}-{}",
@@ -474,7 +509,7 @@ impl Engine {
             let mut new_depth = depth.clone();
             board.make_move(piece_coords, move_);
             if (piece_coords.0 - move_.0).abs() > 1 {
-                new_depth += 1;
+                new_depth += 2;
             }
             let (mut eval, move_sequence) = self.negamax(
                 board,
