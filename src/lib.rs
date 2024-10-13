@@ -57,56 +57,50 @@ impl Board {
     }
 
     fn check_clear_path(&self) -> i8 {
-        let check_cell = |cell: &(usize, usize)| -> bool {
-            let direction: i32 = if self.board[cell.0][cell.1] == 1 { -1 } else { 1 };
-            let distance_to_victory: i32 = if self.board[cell.0][cell.1] == 1 {
-                (cell.0 as i32) + 1
-            } else {
-                9 - (cell.0 as i32)
-            };
+        // let check_cell = |cell: &(usize, usize)| -> bool {
+        //     let direction: i32 = if self.board[cell.0][cell.1] == 1 { -1 } else { 1 };
+        //     let distance_to_victory: i32 = if self.board[cell.0][cell.1] == 1 {
+        //         (cell.0 as i32) + 1
+        //     } else {
+        //         9 - (cell.0 as i32)
+        //     };
 
-            for i in 1..distance_to_victory {
-                let row = (cell.0 as i32) + (i as i32) * direction;
-                let mut cols: Vec<i32> = vec![];
-                let lower = -distance_to_victory;
-                let upper = distance_to_victory + 1;
-                for j in lower..upper {
-                    let col = (cell.1 as i32) + j;
-                    if col >= 0 && col < 9 {
-                        cols.push(col);
-                    }
-                }
+        //     for i in 1..distance_to_victory {
+        //         let row = (cell.0 as i32) + (i as i32) * direction;
+        //         let mut cols: Vec<i32> = vec![];
+        //         let lower = -distance_to_victory;
+        //         let upper = distance_to_victory + 1;
+        //         for j in lower..upper {
+        //             let col = (cell.1 as i32) + j;
+        //             if col >= 0 && col < 9 {
+        //                 cols.push(col);
+        //             }
+        //         }
 
-                for col in cols {
-                    if self.board[row as usize][col as usize] != 0 {
-                        return false;
-                    }
-                }
-            }
+        //         for col in cols {
+        //             if self.board[row as usize][col as usize] != 0 {
+        //                 return false;
+        //             }
+        //         }
+        //     }
 
-            // println!("Clear path: {:?}", Board::convert_coord_to_str((cell.0 as i8, cell.1 as i8)));
-            // println!("Direction: {}", direction);
-            // println!("Distance to victory: {}", distance_to_victory);
-            // println!("Player: {}", self.board[cell.0][cell.1]);
-            // println!("Board: {:?}", self.board);
+        //     true
+        // };
 
-            true
-        };
-
-        for i in 1..8 {
-            for j in 0..9 {
-                let p = self.board[i][j] as i32;
-                if p == 1 {
-                    if check_cell(&(i, j)) {
-                        return 1;
-                    }
-                } else if p == 2 {
-                    if check_cell(&(i, j)) {
-                        return 2;
-                    }
-                }
-            }
-        }
+        // for i in 1..8 {
+        //     for j in 0..9 {
+        //         let p = self.board[i][j] as i32;
+        //         if p == 1 {
+        //             if check_cell(&(i, j)) {
+        //                 return 1;
+        //             }
+        //         } else if p == 2 {
+        //             if check_cell(&(i, j)) {
+        //                 return 2;
+        //             }
+        //         }
+        //     }
+        // }
 
         return 0;
     }
@@ -463,7 +457,7 @@ impl Engine {
                 }
             }
 
-            if self.using_time_limit {
+            if self.using_time_limit && best_eval != 1000.0 {
                 depth += 1;
             } else {
                 break;
