@@ -8,7 +8,8 @@ Features:
 - [x] Game simulator
 - [x] Negamax with Alpha Beta Pruning
 - [x] Iterative deeping with time limit
-- [x] Trasposition table (improvable)
+- [x] Trasposition table
+- [x] Killer Moves
 - [x] Dynamic Deeping when capturing
 - [ ] Multi-threading
 

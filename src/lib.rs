@@ -2,6 +2,7 @@ use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::cmp::Ordering;
 use std::time::{ Duration, Instant };
+// use std::thread::current;
 // use rayon::prelude::*;
 
 const INITIAL_BOARD: [[i8; 9]; 9] = [
@@ -226,9 +227,25 @@ struct Engine {
     time_limit: Duration,
     using_time_limit: bool,
     start_time: Instant,
+    killer_moves: Vec<Vec<((i8, i8), (i8, i8))>>,
+    max_depth_reached: i32,
 }
 
 impl Engine {
+    fn new(player: i8, depth: i32, time_limit: i32) -> Engine {
+        Engine {
+            player,
+            depth,
+            transposition_table: HashMap::new(),
+            table_hits: 0,
+            time_limit: Duration::from_secs(time_limit as u64),
+            using_time_limit: false,
+            start_time: Instant::now(),
+            killer_moves: vec![vec![]; 30 as usize],
+            max_depth_reached: 0,
+        }
+    }
+
     fn evaluate(&self, board: &Board) -> f64 {
         let player_prospective =
             (if board.current_player == self.player { 1 } else { -1 }) *
@@ -323,7 +340,7 @@ impl Engine {
 
         self.using_time_limit = self.time_limit > Duration::from_secs(0);
 
-        let moves = self.get_ordered_moves(board); // Use ordered moves
+        let moves = self.get_ordered_moves(board, 0); // Use ordered moves
         if board.board == INITIAL_BOARD {
             return ("D4-D5".to_string(), 0.0);
         }
@@ -344,9 +361,9 @@ impl Engine {
 
         while self.start_time.elapsed() < self.time_limit || !self.using_time_limit {
             for (piece_coords, move_) in &moves {
-                if self.start_time.elapsed() >= self.time_limit && self.using_time_limit {
-                    break;
-                }
+                // if self.start_time.elapsed() >= self.time_limit && self.using_time_limit {
+                //     break;
+                // }
                 board.make_move(*piece_coords, *move_);
 
                 let (mut eval, move_sequence) = self.negamax(
@@ -354,7 +371,8 @@ impl Engine {
                     depth.clone() - 1,
                     -beta,
                     -alpha,
-                    true
+                    true,
+                    1
                 );
 
                 eval = -eval;
@@ -408,9 +426,9 @@ impl Engine {
             println!("{}: {}", move_, expected_eval);
         }
 
-        if self.using_time_limit {
-            println!("Max Depth reached: {}", depth);
-        }
+        println!("Depth Set: {}", depth);
+        println!("Max Depth Reached: {}", self.max_depth_reached);
+        println!("Solution Depth: {}", best_move_sequence.len());
 
         (best_move_str, expected_eval)
     }
@@ -421,7 +439,8 @@ impl Engine {
         depth: i32,
         mut alpha: f64,
         beta: f64,
-        hash_table: bool
+        hash_table: bool,
+        current_depth: i32
     ) -> (f64, Vec<String>) {
         // Check in hash table
         let board_lookup = board.get_bitboard();
@@ -442,13 +461,14 @@ impl Engine {
         if depth == 0 || board.is_game_over() > 0 {
             let eval = self.evaluate(board);
             self.transposition_table.insert(board_lookup, (depth, eval, Vec::new()));
+            self.max_depth_reached = self.max_depth_reached.max(current_depth);
             return (eval, Vec::new());
         }
 
         let mut best_eval = f64::NEG_INFINITY;
         let mut best_move_sequence = Vec::new();
 
-        let moves = self.get_ordered_moves(board); // Use ordered moves
+        let moves = self.get_ordered_moves(board, current_depth); // Use ordered moves
 
         for (piece_coords, move_) in moves {
             let mut new_depth = depth.clone();
@@ -461,7 +481,8 @@ impl Engine {
                 new_depth - 1,
                 -beta,
                 -alpha,
-                hash_table
+                hash_table,
+                current_depth + 1
             );
 
             eval = -eval;
@@ -475,6 +496,10 @@ impl Engine {
                     )
                 ];
                 best_move_sequence.extend(move_sequence);
+
+                if depth > 0 {
+                    self.killer_moves[(current_depth as usize) - 1] = vec![(piece_coords, move_)];
+                }
             }
             board.undo_move();
 
@@ -496,7 +521,7 @@ impl Engine {
         (best_eval, best_move_sequence)
     }
 
-    fn get_ordered_moves(&self, board: &Board) -> Vec<((i8, i8), (i8, i8))> {
+    fn get_ordered_moves(&self, board: &Board, current_depth: i32) -> Vec<((i8, i8), (i8, i8))> {
         let mut moves: Vec<((i8, i8), (i8, i8))> = Vec::new();
         for (piece, piece_moves) in &board.legal_moves {
             let piece_coords = (
@@ -518,6 +543,13 @@ impl Engine {
 
         if board.current_player == 1 {
             moves.reverse();
+        }
+
+        if current_depth > 0 {
+            let killer_moves = &self.killer_moves[(current_depth as usize) - 1];
+            moves.sort_by_key(|m| {
+                if killer_moves.contains(m) { 0 } else { 1 }
+            });
         }
 
         moves
@@ -556,15 +588,7 @@ fn get_best_move(
     depth: i32,
     max_time: i32
 ) -> (String, f64) {
-    let mut engine = Engine {
-        player,
-        depth,
-        transposition_table: HashMap::new(),
-        table_hits: 0,
-        time_limit: Duration::from_secs(max_time as u64),
-        using_time_limit: false,
-        start_time: Instant::now(),
-    };
+    let mut engine = Engine::new(player, depth, max_time);
     let mut board = Board {
         board: board.clone(),
         past_legal_moves: vec![],
@@ -585,15 +609,8 @@ fn get_best_move(
 
 #[pyfunction]
 fn evaluate_stand_alone(board: Vec<Vec<i8>>, board_current_plater: i8, player: i8) -> f64 {
-    let engine = Engine {
-        player,
-        depth: 0,
-        transposition_table: HashMap::new(),
-        table_hits: 0,
-        time_limit: Duration::from_secs(0),
-        using_time_limit: false,
-        start_time: Instant::now(),
-    };
+    let engine = Engine::new(player, 1, 0);
+
     let mut board = Board {
         board: board.clone(),
         past_legal_moves: vec![],
