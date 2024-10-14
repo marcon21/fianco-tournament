@@ -595,7 +595,7 @@ impl Engine {
         }
 
         moves.sort_by(|a: &((i8, i8), (i8, i8)), b: &((i8, i8), (i8, i8))| {
-            if a.0 > b.0 {
+            if a.0.0 > b.0.0 {
                 return Ordering::Less;
             } else {
                 return Ordering::Greater;
