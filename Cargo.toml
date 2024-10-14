@@ -9,6 +9,5 @@ crate-type = ["cdylib"]
 
 [dependencies]
 numpy = "0.21.0"
-pyo3 = "0.21.0"
-rayon = "1.5"
-once_cell = "1.20.2"
+pyo3 = { version = "0.21.0", features = ["extension-module", "generate-import-lib"] }
+

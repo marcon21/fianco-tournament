@@ -1,0 +1,1 @@
+maturin dev --release && python gui.py

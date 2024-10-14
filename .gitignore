@@ -4,11 +4,12 @@ moves.txt
 game.txt
 
 Cargo.lock
+last_game.txt
 
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
-*.py[cod]
+# *.py[cod]
 *$py.class
 
 # C extensions

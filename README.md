@@ -19,7 +19,7 @@ It is suggested to use a python virtual environment to run the project and insta
 
 To build the project from scratch, you will need to install the rust toolchain and the maturin package. For more information on getting started with PyO3, visit the [PyO3 Getting Started Guide](https://pyo3.rs/v0.22.3/getting-started).
 
-## How to run
+## How to build
 
 To build the project, run the following command:
 
@@ -27,7 +27,11 @@ To build the project, run the following command:
 maturin dev --release
 ```
 
-To run the project, run the following command:
+# How to run
+
+To run the project:
+
+- Run the following command to start the game:
 
 ```bash
 python gui.py

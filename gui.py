@@ -4,9 +4,15 @@ from pygame.locals import *
 from time import time, sleep
 from parameters import *
 from board import Board
+import os
 
-import fianco_tournament as ft
 from functools import lru_cache
+
+# if macos
+if os.name == "posix" or os.name == "darwin":
+    import fianco_tournament as ft
+elif os.name == "nt":
+    import fianco_tournament_win as ft
 
 pygame.init()
 window = pygame.display.set_mode(GAME_RES, HWACCEL | HWSURFACE | DOUBLEBUF)
@@ -91,12 +97,12 @@ while True:
                     # Undo move
                     board.undo_move()
                     current_selection = None
-                elif event.key == K_UP:
-                    DEPTH += 1
-                    print(f"Depth set to: {DEPTH}")
-                elif event.key == K_DOWN:
-                    DEPTH -= 1
-                    print(f"Depth set to: {DEPTH}")
+                # elif event.key == K_UP:
+                #     DEPTH += 1
+                #     print(f"Depth set to: {DEPTH}")
+                # elif event.key == K_DOWN:
+                #     DEPTH -= 1
+                #     print(f"Depth set to: {DEPTH}")
 
             if event.type == MOUSEBUTTONDOWN:
                 # Manual Move
@@ -148,8 +154,8 @@ while True:
     window.blit(text, (WIDTH - 270, HEIGHT - 130))
 
     # Depth text
-    text = font.render(f"Depth: {DEPTH}", True, (0, 0, 0))
-    window.blit(text, (WIDTH - 270, HEIGHT - 100))
+    # text = font.render(f"Depth: {DEPTH}", True, (0, 0, 0))
+    # window.blit(text, (WIDTH - 270, HEIGHT - 100))
 
     # Evaluation Text
     text = font.render(
