@@ -21,7 +21,7 @@ To build the project from scratch, you will need to install the rust toolchain a
 
 ## How to build
 
-To build the project, run the following command:
+To build the project and install it in the local env, run the following command:
 
 ```bash
 maturin dev --release
