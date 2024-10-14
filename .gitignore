@@ -5,7 +5,8 @@ game.txt
 
 Cargo.lock
 last_game.txt
-./export_for_windows.sh
+export_for_windows.sh
+export_windows.sh
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

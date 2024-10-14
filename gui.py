@@ -8,10 +8,10 @@ import os
 
 from functools import lru_cache
 
-# if macos
-if os.name == "posix" or os.name == "darwin":
+try:
     import fianco_tournament as ft
-elif os.name == "nt":
+except:
+    # check for local compiled version
     import fianco_tournament_win as ft
 
 pygame.init()
