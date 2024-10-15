@@ -29,6 +29,8 @@ maturin dev --release
 
 # How to run
 
+Make sure to have the library installed in the local env by building it or by installing the correct wheel
+
 To run the project:
 
 - Run the following command to start the game:
