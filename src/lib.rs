@@ -426,7 +426,7 @@ impl Engine {
         let mut depth_search_completed: i32 = 0;
 
         if self.using_time_limit {
-            depth = 1;
+            depth = 2;
         } else {
             depth = self.depth;
         }
@@ -465,12 +465,15 @@ impl Engine {
                 }
             }
 
-            best_move = temp_best_move;
-            best_move_sequence = temp_best_move_sequence.clone();
-            depth_search_completed = depth.clone();
+            // if all calculation is completed within time limit than save the result
+            if self.using_time_limit && self.start_time.elapsed() < self.time_limit {
+                best_move = temp_best_move.clone();
+                best_move_sequence = temp_best_move_sequence.clone();
+                depth_search_completed = depth.clone();
+            }
 
             if self.using_time_limit {
-                if depth == 1 {
+                if depth == 2 {
                     depth = self.depth;
                 } else {
                     depth += 1;
@@ -496,11 +499,17 @@ impl Engine {
             let coords: Vec<&str> = move_.split('-').collect();
             let start = Board::convert_str_to_coord(coords[0]);
             let end: (i8, i8) = Board::convert_str_to_coord(coords[1]);
+            let is_capture: bool = ((start.0 as isize) - (end.0 as isize)).abs() > 1;
+            let piece_color = if board.current_player == 1 { "W" } else { "B" };
             board.make_move(start, end);
             expected_eval =
                 self.evaluate(board) *
                 (if self.player == board.current_player { 1.0 } else { -1.0 });
-            println!("{}: {}", move_, expected_eval);
+            println!("{} {}: {} {}", piece_color, move_, expected_eval, if is_capture {
+                "\tCapture"
+            } else {
+                ""
+            });
         }
 
         println!("Depth Seach Completed: {}", depth_search_completed);
@@ -551,7 +560,7 @@ impl Engine {
             let mut new_depth = depth.clone();
             board.make_move(piece_coords, move_);
             if (piece_coords.0 - move_.0).abs() > 1 {
-                new_depth += 2;
+                new_depth += 1;
             }
             let (mut eval, move_sequence) = self.negamax(
                 board,
@@ -676,10 +685,6 @@ fn get_best_move(
     board.calculate_legal_moves();
 
     let (best_move, expected_eval) = engine.get_best_move(&mut board);
-    if best_move == "A9-A9" {
-        board.calculate_legal_moves();
-        println!("{:?}", board.legal_moves);
-    }
 
     return (best_move, expected_eval);
 }
