@@ -32,6 +32,18 @@ struct Bitboards {
 }
 
 impl Board {
+    fn new(board: Vec<Vec<i8>>, current_player: i8) -> Board {
+        let mut b: Board = Board {
+            board,
+            past_legal_moves: vec![],
+            past_moves: vec![],
+            current_player,
+            legal_moves: HashMap::new(),
+        };
+        b.calculate_legal_moves();
+        b
+    }
+
     fn convert_coord_to_str(pos: (i8, i8)) -> String {
         // Pos in format (8, 0) to A1
         let col = (b'A' + (pos.1 as u8)) as char;
@@ -675,14 +687,7 @@ fn get_best_move(
     max_time: i32
 ) -> (String, f64) {
     let mut engine = Engine::new(player, depth, max_time);
-    let mut board = Board {
-        board: board.clone(),
-        past_legal_moves: vec![],
-        past_moves: vec![],
-        current_player: board_current_plater,
-        legal_moves: HashMap::new(),
-    };
-    board.calculate_legal_moves();
+    let mut board = Board::new(board.clone(), board_current_plater);
 
     let (best_move, expected_eval) = engine.get_best_move(&mut board);
 
@@ -692,15 +697,7 @@ fn get_best_move(
 #[pyfunction]
 fn evaluate_stand_alone(board: Vec<Vec<i8>>, board_current_plater: i8, player: i8) -> f64 {
     let engine = Engine::new(player, 1, 0);
-
-    let mut board = Board {
-        board: board.clone(),
-        past_legal_moves: vec![],
-        past_moves: vec![],
-        current_player: board_current_plater,
-        legal_moves: HashMap::new(),
-    };
-    board.calculate_legal_moves();
+    let board = Board::new(board.clone(), board_current_plater);
 
     return engine.evaluate(&board);
 }
