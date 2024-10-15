@@ -25,6 +25,8 @@ font = pygame.font.SysFont("Arial", 24)
 
 
 board = Board()
+# board.load_moves("last_game.txt")
+
 
 evaluate_function = lru_cache(maxsize=1000)(
     lambda board: round(ft.evaluate_stand_alone(board.board, 1, 1), 3)
@@ -97,6 +99,8 @@ while True:
                     # Undo move
                     board.undo_move()
                     current_selection = None
+                elif event.key == K_s:
+                    board.save_moves("last_game.txt")
                 # elif event.key == K_UP:
                 #     DEPTH += 1
                 #     print(f"Depth set to: {DEPTH}")
@@ -175,7 +179,7 @@ while True:
         print("Game Over")
         player = "White" if board.current_player == 2 else "Black"
         print(f"Player {player} wins")
-        board.save_moves("last_game.txt")
+        # board.save_moves("last_game.txt")
 
     # current_selection = None
     # best_move = think_best_move(board)

@@ -391,9 +391,13 @@ impl Engine {
 
     fn get_best_move(&mut self, board: &mut Board) -> (String, f64) {
         self.start_time = Instant::now();
-        let mut best_eval = f64::NEG_INFINITY;
         let mut best_move: ((i8, i8), (i8, i8)) = ((0, 0), (0, 0));
         let mut best_move_sequence = Vec::new();
+
+        let mut temp_best_eval = f64::NEG_INFINITY;
+        let mut temp_best_move: ((i8, i8), (i8, i8)) = ((0, 0), (0, 0));
+        let mut temp_best_move_sequence = Vec::new();
+
         let mut alpha = f64::NEG_INFINITY;
         let beta = f64::INFINITY;
 
@@ -418,7 +422,14 @@ impl Engine {
             );
         }
 
-        let mut depth = 1;
+        let mut depth: i32;
+        let mut depth_search_completed: i32 = 0;
+
+        if self.using_time_limit {
+            depth = 1;
+        } else {
+            depth = self.depth;
+        }
 
         while self.start_time.elapsed() < self.time_limit || !self.using_time_limit {
             for (piece_coords, move_) in &moves {
@@ -434,17 +445,17 @@ impl Engine {
                 );
 
                 eval = -eval;
-                if eval > best_eval {
-                    best_eval = eval;
-                    best_move = (*piece_coords, *move_);
-                    best_move_sequence = vec![
+                if eval > temp_best_eval {
+                    temp_best_eval = eval;
+                    temp_best_move = (*piece_coords, *move_);
+                    temp_best_move_sequence = vec![
                         format!(
                             "{}-{}",
                             Board::convert_coord_to_str(*piece_coords),
                             Board::convert_coord_to_str(*move_)
                         )
                     ];
-                    best_move_sequence.extend(move_sequence);
+                    temp_best_move_sequence.extend(move_sequence);
                 }
                 board.undo_move();
 
@@ -453,6 +464,10 @@ impl Engine {
                     break;
                 }
             }
+
+            best_move = temp_best_move;
+            best_move_sequence = temp_best_move_sequence.clone();
+            depth_search_completed = depth.clone();
 
             if self.using_time_limit {
                 if depth == 1 {
@@ -488,7 +503,7 @@ impl Engine {
             println!("{}: {}", move_, expected_eval);
         }
 
-        println!("Depth Set: {}", depth);
+        println!("Depth Seach Completed: {}", depth_search_completed);
         println!("Max Depth Reached: {}", self.max_depth_reached);
         println!("Solution Depth: {}", best_move_sequence.len());
 
