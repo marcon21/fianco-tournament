@@ -5,6 +5,7 @@ from time import time, sleep
 from parameters import *
 from board import Board
 import os
+import sys
 
 from functools import lru_cache
 
@@ -25,7 +26,11 @@ font = pygame.font.SysFont("Arial", 24)
 
 
 board = Board()
-# board.load_moves("last_game.txt")
+
+# Check for "--load" argument
+if "--load" in sys.argv:
+    board.load_moves("save_state.txt")
+    print("Loaded last game")
 
 
 evaluate_function = lru_cache(maxsize=1000)(
@@ -92,15 +97,15 @@ while True:
                     current_selection = None
                     best_move = think_best_move(board)
                     board.move(best_move)
-                elif event.key == K_t:
-                    # Think and print best move
-                    best_move = think_best_move(board)
+                # elif event.key == K_t:
+                #     # Think and print best move
+                #     best_move = think_best_move(board)
                 elif event.key == K_u:
                     # Undo move
                     board.undo_move()
                     current_selection = None
-                elif event.key == K_s:
-                    board.save_moves("last_game.txt")
+                # elif event.key == K_s:
+                #     board.save_moves("last_game.txt")
                 # elif event.key == K_UP:
                 #     DEPTH += 1
                 #     print(f"Depth set to: {DEPTH}")

@@ -2,6 +2,7 @@ gui.py.lprof
 moves copy.txt
 moves.txt
 game.txt
+save_state.txt
 
 Cargo.lock
 last_game.txt

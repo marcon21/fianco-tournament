@@ -59,7 +59,7 @@ class Board:
             return
         self.legal_moves = self.get_all_possible_moves(self.current_player)
 
-    def load_moves(self, file: string):
+    def load_moves(self, file: string = "save_state.txt"):
         with open(file, "r") as f:
             lines = f.readlines()
             for line in lines:
@@ -170,6 +170,8 @@ class Board:
         self.current_player = self.current_player % 2 + 1
 
         self.calculate_legal_moves()
+
+        self.save_moves("save_state.txt")
 
     def undo_move(self):
         if not self.past_moves:
