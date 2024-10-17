@@ -347,12 +347,13 @@ impl Engine {
             _ => {}
         }
 
+        let mut clear_path = 0.0;
         match board.check_clear_path() {
             1 => {
-                return 500.0 * (player_prospective as f64);
+                clear_path = 500.0;
             }
             2 => {
-                return -500.0 * (player_prospective as f64);
+                clear_path = -500.0;
             }
             _ => {}
         }
@@ -400,7 +401,7 @@ impl Engine {
 
         let avg_diff: f64 = (avg_ones - avg_twos) as f64;
 
-        return ((material_diff as f64) * 5.0 + avg_diff * 10.0) * (player_prospective as f64);
+        ((material_diff as f64) * 5.0 + avg_diff * 10.0 + clear_path) * (player_prospective as f64)
     }
 
     fn get_best_move(&mut self, board: &mut Board) -> (String, f64) {

@@ -7,6 +7,7 @@ from board import Board
 import os
 import sys
 import multiprocessing
+from copy import deepcopy
 
 multiprocessing.set_start_method("fork")
 
@@ -62,7 +63,9 @@ calculating_text_rect = calculating_text.get_rect(center=(WIDTH // 2, HEIGHT // 
 
 
 def think_best_move(board, time_it=True):
-    global white_time, black_time
+    white_time = 0
+    black_time = 0
+
     print(f"Player {player} Evaluating...")
     start_time = time()
 
@@ -73,8 +76,8 @@ def think_best_move(board, time_it=True):
             board.board, board.current_player, 1, DEPTH, min(MAX_TIME, time_left * 0.15)
         )
         if time_it:
-            white_time += time() - start_time
-        print(f"White time: {white_time:.2f}")
+            white_time = time() - start_time
+            print(f"White time: {white_time:.2f}")
     else:
         time_left = 600 - black_time
         time_left = max(int(time_left), 1)
@@ -82,22 +85,27 @@ def think_best_move(board, time_it=True):
             board.board, board.current_player, 2, DEPTH, min(MAX_TIME, time_left * 0.15)
         )
         if time_it:
-            black_time += time() - start_time
-        print(f"Black time: {black_time:.2f}")
+            black_time = time() - start_time
+            print(f"Black time: {black_time:.2f}")
 
     print(
         f"Time taken: {time()-start_time:.2f}, Move: {best_move}, Expected Eval: {expected_res}, Total time: {white_time+black_time:.2f}"
     )
 
-    print()
+    if white_time + black_time < 0.1:
+        sleep(0.5)
 
     shared_queue.put(best_move)
+    shared_queue.put(white_time)
+    shared_queue.put(black_time)
 
 
 while True:
     if current_process is not None:
         if not current_process.is_alive():
             best_move = shared_queue.get()
+            white_time += shared_queue.get()
+            black_time += shared_queue.get()
             board.move(best_move)
             current_process = None
 
@@ -120,7 +128,7 @@ while True:
                     # board.move(best_move)
                     if current_process == None:
                         current_process = multiprocessing.Process(
-                            target=think_best_move, args=(board, False)
+                            target=think_best_move, args=(board, True)
                         )
                         current_process.start()
 
@@ -236,7 +244,7 @@ while True:
             current_selection = None
             if current_process is None:
                 current_process = multiprocessing.Process(
-                    target=think_best_move, args=(board, False)
+                    target=think_best_move, args=(board, True)
                 )
                 current_process.start()
 
