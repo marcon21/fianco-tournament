@@ -290,6 +290,7 @@ struct Engine {
     start_time: Instant,
     max_depth_reached: i32,
     killer_moves: Vec<Vec<((i8, i8), (i8, i8))>>,
+    growth_rate: f64,
 }
 
 impl Engine {
@@ -304,6 +305,7 @@ impl Engine {
             start_time: Instant::now(),
             max_depth_reached: 0,
             killer_moves: vec![vec![]; 100 as usize],
+            growth_rate: 0.96,
         }
     }
 
@@ -388,8 +390,8 @@ impl Engine {
             .map(|&x| x + 1)
             .collect();
 
-        let avg_ones = weighted_average(&ones_rows);
-        let avg_twos = weighted_average(&twos_rows);
+        let avg_ones = weighted_average(&ones_rows, self.growth_rate);
+        let avg_twos = weighted_average(&twos_rows, self.growth_rate);
 
         // println!("Ones rows: {:?}", ones_rows);
         // println!("Twos rows: {:?}", twos_rows);
@@ -654,14 +656,13 @@ impl Engine {
     }
 }
 
-fn weighted_average(values: &Vec<usize>) -> f64 {
+fn weighted_average(values: &Vec<usize>, growth_rate: f64) -> f64 {
     // Define a base for the exponential function
-    let base: f64 = 1.04;
 
     // Calculate the weights using an exponential function
     let weights: Vec<f64> = values
         .iter()
-        .map(|&v| base.powf(v as f64))
+        .map(|&v| growth_rate.powf(v as f64))
         .collect();
 
     // Compute the weighted sum of the values

@@ -166,6 +166,14 @@ while True:
     # text = font.render(f"Depth: {DEPTH}", True, (0, 0, 0))
     # window.blit(text, (WIDTH - 270, HEIGHT - 100))
 
+    # Last Move Text
+    text = font.render(
+        f"Last Move: {board.past_moves[-1] if len(board.past_moves) > 0 else ''}",
+        True,
+        (0, 0, 0),
+    )
+    window.blit(text, (WIDTH - 270, HEIGHT - 100))
+
     # Evaluation Text
     text = font.render(
         f"Eval: {'+' if current_board_eval>=0 else ' '}{current_board_eval}",
