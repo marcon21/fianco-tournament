@@ -6,6 +6,9 @@ from parameters import *
 from board import Board
 import os
 import sys
+import multiprocessing
+
+multiprocessing.set_start_method("fork")
 
 from functools import lru_cache
 
@@ -23,7 +26,7 @@ pygame.display.set_caption(GAME_TITLE)
 
 pygame.font.init()
 font = pygame.font.SysFont("Arial", 24)
-
+font_calculating = pygame.font.SysFont("Arial", 100)
 
 board = Board()
 
@@ -43,6 +46,19 @@ current_selection = None
 move_count = 0
 white_time = 0
 black_time = 0
+current_process = None
+shared_queue = multiprocessing.Queue()
+player = "White"
+
+
+autoplay = []
+if "--autoplay-w" in sys.argv:
+    autoplay.append(1)
+if "--autoplay-b" in sys.argv:
+    autoplay.append(2)
+
+calculating_text = font_calculating.render("Calculating...", True, (255, 0, 0))
+calculating_text_rect = calculating_text.get_rect(center=(WIDTH // 2, HEIGHT // 2))
 
 
 def think_best_move(board, time_it=True):
@@ -75,11 +91,16 @@ def think_best_move(board, time_it=True):
 
     print()
 
-    return best_move
+    shared_queue.put(best_move)
 
 
 while True:
-    player = "White" if board.current_player == 1 else "Black"
+    if current_process is not None:
+        if not current_process.is_alive():
+            best_move = shared_queue.get()
+            board.move(best_move)
+            current_process = None
+
     current_board_eval = evaluate_function(board)
     try:
         for event in pygame.event.get():
@@ -94,16 +115,28 @@ while True:
                 #     current_selection = None
                 elif event.key == K_e:
                     # Evaluate with engine and make move
-                    current_selection = None
-                    best_move = think_best_move(board)
-                    board.move(best_move)
+                    # current_selection = None
+                    # best_move = think_best_move(board)
+                    # board.move(best_move)
+                    if current_process == None:
+                        current_process = multiprocessing.Process(
+                            target=think_best_move, args=(board, False)
+                        )
+                        current_process.start()
+
                 # elif event.key == K_t:
                 #     # Think and print best move
                 #     best_move = think_best_move(board)
                 elif event.key == K_u:
                     # Undo move
+                    if current_process is not None:
+                        print("Terminating process...")
+                        current_process.kill()
+                        current_process = None
+
                     board.undo_move()
                     current_selection = None
+
                 # elif event.key == K_s:
                 #     board.save_moves("last_game.txt")
                 # elif event.key == K_UP:
@@ -144,6 +177,7 @@ while True:
         print(e)
 
     window.fill(SCREEN_COLOR)
+    player = "White" if board.current_player == 1 else "Black"
 
     # Draw board
     board.draw_board(window, active_piece=current_selection)
@@ -186,23 +220,24 @@ while True:
     text = font.render(f"Current player: {player}", True, (0, 0, 0))
     window.blit(text, (WIDTH - 270, HEIGHT - 40))
 
+    # Calculating text
+    if current_process is not None:
+        window.blit(calculating_text, calculating_text_rect)
+
     pygame.display.flip()
 
     if board.is_game_over():
         print("Game Over")
         player = "White" if board.current_player == 2 else "Black"
         print(f"Player {player} wins")
-        # board.save_moves("last_game.txt")
 
-    # current_selection = None
-    # best_move = think_best_move(board)
-    # board.move(best_move)
-    # sleep(1)
-
-    # if board.current_player == 2:
-    #     current_selection = None
-    #     best_move = think_best_move(board)
-    #     board.move(best_move)
-    #     sleep(1)
+    for p in autoplay:
+        if board.current_player == p:
+            current_selection = None
+            if current_process is None:
+                current_process = multiprocessing.Process(
+                    target=think_best_move, args=(board, False)
+                )
+                current_process.start()
 
     dt = clock.tick(FPS) / 1000
