@@ -68,55 +68,6 @@ impl Board {
         return 0;
     }
 
-    fn check_clear_path(&self) -> i8 {
-        let check_cell = |cell: &(usize, usize)| -> bool {
-            let direction: i32 = if self.board[cell.0][cell.1] == 1 { -1 } else { 1 };
-            let distance_to_victory: i32 = if self.board[cell.0][cell.1] == 1 {
-                (cell.0 as i32) + 1
-            } else {
-                9 - (cell.0 as i32)
-            };
-
-            for i in 1..distance_to_victory {
-                let row = (cell.0 as i32) + (i as i32) * direction;
-                let mut cols: Vec<i32> = vec![];
-                let lower = -distance_to_victory;
-                let upper = distance_to_victory + 1;
-                for j in lower..upper {
-                    let col = (cell.1 as i32) + j;
-                    if col >= 0 && col < 9 {
-                        cols.push(col);
-                    }
-                }
-
-                for col in cols {
-                    if self.board[row as usize][col as usize] != 0 {
-                        return false;
-                    }
-                }
-            }
-
-            true
-        };
-
-        for i in 1..8 {
-            for j in 0..9 {
-                let p = self.board[i][j] as i32;
-                if p == 1 {
-                    if check_cell(&(i, j)) {
-                        return 1;
-                    }
-                } else if p == 2 {
-                    if check_cell(&(i, j)) {
-                        return 2;
-                    }
-                }
-            }
-        }
-
-        return 0;
-    }
-
     fn get_all_possible_moves(&self, player: i8) -> HashMap<String, Vec<(i8, i8)>> {
         let mut legal_moves: HashMap<String, Vec<(i8, i8)>> = HashMap::new();
         let mut capturers: Vec<(i8, i8)> = Vec::new();
@@ -283,7 +234,7 @@ impl Board {
 struct Engine {
     player: i8,
     depth: i32,
-    transposition_table: HashMap<Bitboards, (i32, f64, Vec<String>)>, // Updated to store depth
+    transposition_table: HashMap<Bitboards, (i32, f64, Vec<String>)>,
     table_hits: i32,
     time_limit: Duration,
     using_time_limit: bool,
@@ -347,17 +298,6 @@ impl Engine {
             _ => {}
         }
 
-        let mut clear_path = 0.0;
-        match board.check_clear_path() {
-            1 => {
-                clear_path = 500.0;
-            }
-            2 => {
-                clear_path = -500.0;
-            }
-            _ => {}
-        }
-
         let mut ones_rows: Vec<usize> = board.board
             .iter()
             .enumerate()
@@ -394,14 +334,9 @@ impl Engine {
         let avg_ones = weighted_average(&ones_rows, self.growth_rate);
         let avg_twos = weighted_average(&twos_rows, self.growth_rate);
 
-        // println!("Ones rows: {:?}", ones_rows);
-        // println!("Twos rows: {:?}", twos_rows);
-        // println!("Avg ones: {}", avg_ones);
-        // println!("Avg twos: {}", avg_twos);
-
         let avg_diff: f64 = (avg_ones - avg_twos) as f64;
 
-        ((material_diff as f64) * 5.0 + avg_diff * 10.0 + clear_path) * (player_prospective as f64)
+        ((material_diff as f64) * 5.0 + avg_diff * 10.0) * (player_prospective as f64)
     }
 
     fn get_best_move(&mut self, board: &mut Board) -> (String, f64) {
@@ -415,8 +350,6 @@ impl Engine {
 
         let mut alpha = f64::NEG_INFINITY;
         let beta = f64::INFINITY;
-
-        // println!("Non 0 element in killer moves: {}", self.killer_moves.iter().flatten().count());
 
         self.using_time_limit = self.time_limit > Duration::from_secs(0);
 
@@ -450,6 +383,7 @@ impl Engine {
             for (piece_coords, move_) in &moves {
                 board.make_move(*piece_coords, *move_);
 
+                // Get the evaluation of the move using negamax
                 let (mut eval, move_sequence) = self.negamax(
                     board,
                     depth.clone() - 1,
@@ -458,8 +392,9 @@ impl Engine {
                     true,
                     1
                 );
-
                 eval = -eval;
+
+                // If move is better than previous best move
                 if eval > temp_best_eval {
                     temp_best_eval = eval;
                     temp_best_move = (*piece_coords, *move_);
@@ -491,7 +426,7 @@ impl Engine {
                 if depth == 2 {
                     depth = self.depth;
                 } else {
-                    depth += 1;
+                    depth += 2;
                 }
             } else {
                 break;
@@ -587,6 +522,7 @@ impl Engine {
             );
 
             eval = -eval;
+            // If move is better than previous best move
             if eval > best_eval {
                 best_eval = eval;
                 best_move_sequence = vec![
